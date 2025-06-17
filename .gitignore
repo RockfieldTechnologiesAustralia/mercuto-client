@@ -1,0 +1,35 @@
+.git/
+
+# IDE files
+.idea/
+.vscode/.ropeproject/
+
+# Compiled python
+*.pyc
+__pycache__/
+
+# Setuptools dist
+dist/
+*.egg-info/
+.eggs/
+build/
+*.egg
+
+# Misc
+venv
+venv/
+.noseids
+nosetests.xml
+.mypy_cache/
+
+*.mjs
+
+deployment/mercuto_cdk/mercuto_cdk.out/
+deployment/mercuto_cdk/.mercuto_cdk.staging/
+deployment/mercuto_cdk/.venv/
+**/.venv
+
+website/app/pages/test.vue
+website/nuxt.config.ts
+website/package.json
+.cache/

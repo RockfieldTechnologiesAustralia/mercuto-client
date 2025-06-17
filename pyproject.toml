@@ -1,0 +1,28 @@
+[project]
+name = "mercuto-client"
+authors = [{ name = "Daniel Whipp", email = "daniel.whipp@rocktech.com.au" }]
+description = "Library for interfacing with Rockfield's Mercuto API"
+requires-python = ">=3.12"
+dependencies = [
+    'requests>=2.32',
+]
+version = "0.1.0"
+
+[dependency-groups]
+tests = [
+    'pytest>=8.4',
+    'flake8>=7.2',
+    'mypy>=1.16',
+    'isort>=6.0',
+    "types-requests>=2.32.4.20250611",
+]
+
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.package-data]
+mercuto_client = ["py.typed"]
+
+[tool.mypy]
+strict = false

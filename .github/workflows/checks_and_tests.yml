@@ -1,0 +1,34 @@
+name: Linting, static analysis, and tests
+on: push
+permissions:
+  packages: read # Read packages from GitHub Package Registry
+  contents: read  # This is required for actions/checkout
+jobs:
+  python-checks:
+    timeout-minutes: 5
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.12"]
+    steps:
+      - name: Get repo
+        uses: actions/checkout@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install dependencies
+        run: |
+          uv sync --all-groups
+      - name: Validate import sorting
+        run: |
+          uv run isort ./mercuto_client/ --check --diff
+      - name: Validate Flake8
+        run: |
+          uv run flake8 ./mercuto_client/ --count --max-line-length=150 --show-source --statistics --exclude mercuto-client/build
+      - name: Validate MyPy
+        run: |
+          uv run mypy ./mercuto_client/ --ignore-missing-imports --explicit-package-bases --exclude build/* 
+      - name: Run unit tests
+        run: |
+          uv run pytest ./mercuto_client/
