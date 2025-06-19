@@ -198,6 +198,7 @@ def test_scan_existing_files_that_havnt_been_processed(temp_env: Tuple[FileProce
             # Simulate processing for the first 2 files
             processor.process_next_file()
 
+    time.sleep(0.02)
     processor.scan_existing_files()
     conn: sqlite3.Connection = sqlite3.connect(processor.get_db_path())
     cursor: sqlite3.Cursor = conn.cursor()
