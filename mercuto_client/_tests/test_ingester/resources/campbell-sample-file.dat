@@ -1,0 +1,8 @@
+"TOA5","1174","GRANITE9","1174","GRANITE9.Std.02.01","CPU:TestFileRev1.CRB","44695","low_frequency"
+"TIMESTAMP","RECORD","VWu_1","VWu_2","Therm(1)","Therm(2)","Diag_Max(1)","Diag_Max(2)"
+"TS","RN","","","","","",""
+"","","Smp","Smp","Smp","Smp","Smp","Smp"
+"2023-12-07 00:01:00",111,1234.5,"NAN","NAN","NAN","NAN","NAN"
+"2023-12-07 00:02:00",112,1234.5,"NAN","NAN","NAN","NAN","NAN"
+"2023-12-07 00:03:00",113,1234.5,1234.5,"NAN","NAN","NAN",1537
+"2023-12-07 00:04:00",114,1234.5,1234.5,27.5,25,255,0

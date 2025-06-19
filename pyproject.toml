@@ -9,12 +9,25 @@ dependencies = [
 version = "0.1.0"
 
 [dependency-groups]
+ingester = [
+    "pyftpdlib>=2.0.1",
+    "python-dateutil>=2.9.0.post0",
+    "pytz>=2025.2",
+    "schedule>=1.2.2",
+]
 tests = [
-    'pytest>=8.4',
-    'flake8>=7.2',
-    'mypy>=1.16',
-    'isort>=6.0',
     "types-requests>=2.32.4.20250611",
+    "freezegun>=1.5.2",
+    "types-python-dateutil>=2.9.0.20250516",
+    "types-pytz>=2025.2.0.20250516",
+    "pytest>=8.4.0",
+    "flake8>=7.2.0",
+    "mypy>=1.16.1",
+    "isort>=6.0.1",
+    "schedule>=1.2.2",
+    "python-dateutil>=2.9.0.post0",
+    "pytz>=2025.2",
+    "pyftpdlib>=2.0.1",
 ]
 
 [build-system]
