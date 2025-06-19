@@ -6,7 +6,6 @@ import logging.handlers
 import os
 import sys
 import time
-from itertools import batched
 from typing import Callable, TypeVar
 
 import schedule
@@ -16,7 +15,7 @@ from ..types import DataSample
 from .ftp import simple_ftp_server
 from .parsers import detect_parser
 from .processor import FileProcessor
-from .util import get_free_space_excluding_files, get_my_public_ip
+from .util import batched, get_free_space_excluding_files, get_my_public_ip
 
 logger = logging.getLogger(__name__)
 

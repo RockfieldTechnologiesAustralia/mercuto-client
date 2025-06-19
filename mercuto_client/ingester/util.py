@@ -1,5 +1,7 @@
+import itertools
 import shutil
 from pathlib import Path
+from typing import Iterable, Iterator, TypeVar
 
 import requests
 
@@ -45,3 +47,18 @@ def get_free_space_excluding_files(directory: str) -> int:
 
     # Exclude file sizes from free space
     return max(0, free - files_size)
+
+
+T = TypeVar('T')
+
+
+def batched(iterable: Iterable[T], n: int) -> Iterator[tuple[T, ...]]:
+    """
+    Implementation of itertools.batched for < Python 3.12
+    """
+    it = iter(iterable)
+    while True:
+        chunk = tuple(itertools.islice(it, n))
+        if not chunk:
+            break
+        yield chunk
