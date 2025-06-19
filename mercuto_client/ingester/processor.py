@@ -2,6 +2,7 @@ import logging
 import os
 import shutil
 import sqlite3
+from datetime import datetime, timezone
 from typing import Callable, Optional
 
 logger = logging.getLogger(__name__)
@@ -21,6 +22,9 @@ class FileProcessor:
     :param max_files: Maximum number of files to keep in the buffer directory. If None, no limit is enforced.
     :param free_space_mb: Optional minimum free space in MB to keep on the partition where the buffer directory is located.
         This is combined with max_files to determine when to delete old files and takes precedence over max_files.
+    :param clock: Optional callable that returns the timestamp for the file based on the filename. Takes in the file name as an argument
+        and should return a float representing the timestamp in seconds since the epoch. Defaults to datetime.now().timestamp().
+        This clock is NOT used when scanning existing files, it takes its own clock function.
 
 
     Provides a callback for processing files, which should return True if successful.
@@ -47,6 +51,7 @@ class FileProcessor:
                  max_attempts: int,
                  max_files: Optional[int] = None,
                  free_space_mb: Optional[float] = None,
+                 clock: Optional[Callable[[str], float]] = None
                  ) -> None:
         self._buffer_dir = buffer_dir
         self._db_path = db_path
@@ -54,6 +59,10 @@ class FileProcessor:
         self._max_attempts = max_attempts
         self._process_callback = process_callback
         self._free_space_mb = free_space_mb
+        if clock is None:
+            # Default clock function to get current time in seconds since epoch
+            def clock(_): return datetime.now(timezone.utc).timestamp()
+        self._clock = clock
 
         os.makedirs(self._buffer_dir, exist_ok=True)
         self._init_db()
@@ -84,19 +93,31 @@ class FileProcessor:
         conn.close()
         logger.info("Database initialized.")
 
-    def scan_existing_files(self) -> None:
-        """Detect files added while offline and process them."""
+    def scan_existing_files(self, clock: Optional[Callable[[str], float]] = None) -> None:
+        """
+        Detect files added while offline and process them.
+        :param clock: Optional callable that returns the timestamp for the file based on the filename.
+            If not provided, uses the file's creation time.
+            This may be innaccurate if multiple files are added at once, or if the file system does not support accurate timestamps.
+
+        """
+        if clock is None:
+            # Default clock function to get current time in seconds since epoch
+            def clock(filepath: str) -> float:
+                return os.path.getmtime(filepath)
+
         conn = sqlite3.connect(self._db_path)
         cursor = conn.cursor()
 
-        for filename in sorted(os.listdir(self._buffer_dir), key=lambda f: os.path.getctime(os.path.join(self._buffer_dir, f))):
+        files_with_timestamps = [
+            (filename, clock(os.path.join(self._buffer_dir, filename)))
+            for filename in os.listdir(self._buffer_dir)
+            if os.path.isfile(os.path.join(self._buffer_dir, filename))
+        ]
+
+        for filename, timestamp in sorted(files_with_timestamps, key=lambda x: x[1]):
             filepath = os.path.join(self._buffer_dir, filename)
-            try:
-                timestamp = os.path.getctime(filepath)
-            except FileNotFoundError:
-                logger.warning(
-                    f"File {filepath} not found during scan. Skipping.")
-                continue
+            timestamp = clock(filepath)
 
             cursor.execute(
                 "SELECT COUNT(*) FROM file_buffer WHERE filename = ?", (filename,))
@@ -256,11 +277,7 @@ class FileProcessor:
 
     def add_file_to_db(self, filepath: str) -> None:
         """Adds a new file to database and triggers processing."""
-        try:
-            timestamp = os.path.getctime(filepath)
-        except FileNotFoundError:
-            logger.error(f"File {filepath} not found. Cannot add to database.")
-            return
+        timestamp = self._clock(filepath)
         filename: str = os.path.basename(filepath)
         conn = sqlite3.connect(self._db_path)
         cursor = conn.cursor()

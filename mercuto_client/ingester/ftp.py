@@ -7,8 +7,7 @@ import threading
 from datetime import datetime, timezone
 from typing import Callable, Iterator, Optional
 
-from pyftpdlib.authorizers import \
-    DummyAuthorizer  # type: ignore[import-untyped] # noqa
+from pyftpdlib import authorizers  # type: ignore[import-untyped]
 from pyftpdlib.handlers import FTPHandler  # type: ignore[import-untyped]
 from pyftpdlib.servers import FTPServer  # type: ignore[import-untyped]
 
@@ -22,12 +21,23 @@ def simple_ftp_server(directory: str,
                       port: int = 2121,
                       callback: Optional[Callable[[str], None]] = None,
                       workdir: Optional[str] = None,
-                      rename: bool = True) -> Iterator[None]:
+                      rename: bool = True,
+                      clock: Optional[Callable[[], datetime]] = None) -> Iterator[None]:
     """
     Wrapper for a simple FTP server that allows uploading files to a specified directory.
     Callback function can be provided which is called with the destination path of each uploaded file.
     Files are first uploaded to a workdirectory and then moved to the specified directory.
     If workdir is not specified, a temporary directory is used.
+
+    :param directory: Directory where files will be uploaded.
+    :param username: Username for FTP authentication.
+    :param password: Password for FTP authentication.
+    :param port: Port on which the FTP server will listen.
+    :param callback: Optional callback function that is called with the destination path of each uploaded file.
+    :param workdir: Optional working directory where files are initially uploaded before moving to the final directory.
+    :param rename: If True, appends a timestamp to the filename to avoid overwriting existing files.
+    :param clock: Function to get the current time, defaults to datetime.now with timezone UTC
+    :return: Context manager that starts the FTP server and allows file uploads.
 
     Runs in a background thread during context manager usage.
 
@@ -43,13 +53,17 @@ def simple_ftp_server(directory: str,
             time.sleep(10)
     ```
     """
+
+    if clock is None:
+        def clock(): return datetime.now(timezone.utc)
+
     def rename_file(file_path: str) -> str:
         """
         Rename the file by appending a timestamp to avoid overwriting.
         Adds the timestamp before the file extension.
         """
         base, ext = os.path.splitext(file_path)
-        timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S")
+        timestamp = clock().strftime("%Y%m%dT%H%M%S")
         new_name = f"{base}_{timestamp}{ext}"
         return new_name
 
@@ -76,7 +90,7 @@ def simple_ftp_server(directory: str,
         workdir_ctx = contextlib.nullcontext(workdir)
 
     with workdir_ctx as workdir:
-        authorizer = DummyAuthorizer()
+        authorizer = authorizers.DummyAuthorizer()
         authorizer.add_user(username, password,
                             workdir, perm='lwe')
         handler = CustomFTPHandler
