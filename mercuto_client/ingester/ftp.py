@@ -7,7 +7,8 @@ import threading
 from datetime import datetime, timezone
 from typing import Callable, Iterator, Optional
 
-from pyftpdlib.authorizers import DummyAuthorizer # type: ignore[import-untyped] # noqa
+from pyftpdlib.authorizers import \
+    DummyAuthorizer  # type: ignore[import-untyped] # noqa
 from pyftpdlib.handlers import FTPHandler  # type: ignore[import-untyped]
 from pyftpdlib.servers import FTPServer  # type: ignore[import-untyped]
 
