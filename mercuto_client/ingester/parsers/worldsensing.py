@@ -17,7 +17,7 @@ def parse_worldsensing_standard_file(filename: str, label_to_channel_code: dict[
 def parse_worldsensing_compact_file(filename: str, label_to_channel_code: dict[str, str],
                                     timezone: Optional[pytz.BaseTzInfo] = None) -> list[DataSample]:
     """
-    Parse a worldsensing custom CSV file. These are generated when using compacted CSV mechanism. 
+    Parse a worldsensing custom CSV file. These are generated when using compacted CSV mechanism.
     """
     return parse_generic_csv_file(
         filename, label_to_channel_code, header_index=1, data_index=0, timezone=timezone)

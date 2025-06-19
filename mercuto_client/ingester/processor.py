@@ -19,7 +19,7 @@ class FileProcessor:
     :param process_callback: Callable that processes a file. Should return True if processing is successful
     :param max_attempts: Maximum number of attempts to process a file before marking it as failed.
     :param max_files: Maximum number of files to keep in the buffer directory. If None, no limit is enforced.
-    :param free_space_mb: Optional minimum free space in MB to keep on the partition where the buffer directory is located. 
+    :param free_space_mb: Optional minimum free space in MB to keep on the partition where the buffer directory is located.
         This is combined with max_files to determine when to delete old files and takes precedence over max_files.
 
 
@@ -40,7 +40,6 @@ class FileProcessor:
         processor.add_file_to_db("path/to/file.txt")
         processor.process_next_file()
     ```
-
     """
 
     def __init__(self, buffer_dir: str, db_path: str,

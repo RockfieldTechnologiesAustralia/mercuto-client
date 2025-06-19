@@ -32,7 +32,7 @@ class MercutoIngester:
             assert self._project['code'] == project_code
 
             self._secondary_channels = client.channels().get_channels(project_code, classification='SECONDARY')
-            self._datatables = list(itertools.chain.from_iterable([l['datatables'] for l in client.devices().list_dataloggers(project_code)]))
+            self._datatables = list(itertools.chain.from_iterable([dt['datatables'] for dt in client.devices().list_dataloggers(project_code)]))
 
         self._channel_map = {c['label']: c['code'] for c in self._secondary_channels}
 
@@ -173,9 +173,11 @@ if __name__ == '__main__':
     parser.add_argument('--workdir', type=str,
                         help='Working directory for the ingester. Default is ~/.mercuto-ingester',)
     parser.add_argument('--logfile', type=str,
-                        help='Log file path. No logs written if not provided. Maximum of 4 log files of 1MB each will be kept. Default is log.txt in the workdir.',)
+                        help='Log file path. No logs written if not provided. Maximum of 4 log files of 1MB each will be kept.\
+                            Default is log.txt in the workdir.')
     parser.add_argument('--mapping', type=str,
-                        help='Path to a JSON file with channel label to channel code mapping. If not provided, the ingester will try to detect the channels from the project.',
+                        help='Path to a JSON file with channel label to channel code mapping.\
+                            If not provided, the ingester will try to detect the channels from the project.',
                         default=None)
     parser.add_argument('--hostname', type=str,
                         help='Hostname to use for the Mercuto server. Default is "https://api.rockfieldcloud.com.au".',
