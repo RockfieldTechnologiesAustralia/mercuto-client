@@ -71,7 +71,7 @@ class MercutoIngester:
             test_base = os.path.basename(test)
             if fnmatch.fnmatch(basename, test_base):
                 return True
-            lhs, _ = os.path.splitext(basename)
+            lhs, _ = os.path.splitext(test_base)
             if basename.startswith(lhs):
                 return True
             return False
@@ -129,6 +129,7 @@ class MercutoIngester:
         logging.info(f"Processing file: {file_path}")
         datatable_code = self.matching_datatable(file_path)
         if datatable_code:
+            logger.info(f"Matched datatable code: {datatable_code} for file: {file_path}")
             return self._upload_file(file_path, datatable_code)
         else:
             parser = detect_parser(file_path)

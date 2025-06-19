@@ -97,5 +97,5 @@ def simple_ftp_server(directory: str,
         finally:
             logger.debug("Stopping FTP server...")
             server.close_all()
-            server_thread.join()
+            server_thread.join(timeout=10)
             logger.debug("FTP server stopped.")
