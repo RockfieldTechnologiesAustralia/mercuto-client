@@ -104,7 +104,7 @@ class FileProcessor:
         if clock is None:
             # Default clock function to get current time in seconds since epoch
             def clock(filepath: str) -> float:
-                return os.path.getmtime(filepath)
+                return os.path.getctime(filepath)
 
         conn = sqlite3.connect(self._db_path)
         cursor = conn.cursor()
