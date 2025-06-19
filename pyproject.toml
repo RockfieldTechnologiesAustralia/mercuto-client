@@ -2,7 +2,7 @@
 name = "mercuto-client"
 authors = [{ name = "Daniel Whipp", email = "daniel.whipp@rocktech.com.au" }]
 description = "Library for interfacing with Rockfield's Mercuto API"
-requires-python = ">=3.11"
+requires-python = ">=3.10"
 dependencies = [
     'requests>=2.32',
 ]

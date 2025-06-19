@@ -168,7 +168,7 @@ def test_scan_existing_files(temp_env: Tuple[FileProcessor, str, str]) -> None:
         test_file = os.path.join(buffer_dir, f"file{i}.txt")
         with open(test_file, "w") as f:
             f.write("Test content")
-        time.sleep(0.01)
+        time.sleep(0.02)
 
     processor.scan_existing_files()
     conn: sqlite3.Connection = sqlite3.connect(processor.get_db_path())
@@ -189,7 +189,7 @@ def test_scan_existing_files_that_havnt_been_processed(temp_env: Tuple[FileProce
         test_file = os.path.join(buffer_dir, f"file{i}.txt")
         with open(test_file, "w") as f:
             f.write("Test content")
-        time.sleep(0.01)
+        time.sleep(0.02)
 
         if i < 3:
             # Simulate adding for the first 3 files
