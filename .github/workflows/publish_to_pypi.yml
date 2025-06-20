@@ -1,0 +1,32 @@
+name: Publish to PyPI
+
+on:
+  push:
+    tags:
+      - 'v*'  # Triggers only when a tag like v1.0.0 is pushed
+permissions:
+  id-token: write # Required for publishing to PyPI
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+    environment: publish
+    steps:
+      - name: Get repo
+        uses: actions/checkout@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          python-version: 3.12
+      - name: Set version from tag
+        run: |
+          TAG_NAME=${GITHUB_REF##*/}
+          VERSION=${TAG_NAME#v}
+          echo "Setting version to $VERSION"
+          sed -i "s/^version = .*/version = \"$VERSION\"/" pyproject.toml
+      - name: Install and build
+        run: |
+          uv sync --all-groups
+          uv build
+      - name: Publish to PyPi
+        run: |
+          uv publish
