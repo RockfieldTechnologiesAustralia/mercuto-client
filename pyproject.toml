@@ -7,6 +7,19 @@ dependencies = [
     'requests>=2.32',
 ]
 version = "0.1.0"
+keywords = ["mercuto", "rockfield", "infratech"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "Topic :: Software Development :: Build Tools",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+]
+[urls]
+homepage = "https://mercuto.rockfieldcloud.com.au"
+repository = "https://github.com/RockfieldTechnologiesAustralia/mercuto-client"
+documentation = "https://github.com/RockfieldTechnologiesAustralia/mercuto-client/blob/main/README.md"
 
 [dependency-groups]
 ingester = [

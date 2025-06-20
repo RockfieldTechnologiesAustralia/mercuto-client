@@ -1,0 +1,25 @@
+name: Publish to PyPI
+
+on:
+  push:
+    tags:
+      - 'v*'  # Triggers only when a tag like v1.0.0 is pushed
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Get repo
+        uses: actions/checkout@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          python-version: 3.12
+      - name: Install and build
+        run: |
+          uv sync --all-groups
+          uv build
+      - name: Publish to PyPi
+        run: |
+          uv publish --repository pypi
