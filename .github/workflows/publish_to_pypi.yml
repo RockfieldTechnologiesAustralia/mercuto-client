@@ -4,7 +4,8 @@ on:
   push:
     tags:
       - 'v*'  # Triggers only when a tag like v1.0.0 is pushed
-
+permissions:
+  id-token: write # Required for publishing to PyPI
 jobs:
   build-and-publish:
     runs-on: ubuntu-latest
