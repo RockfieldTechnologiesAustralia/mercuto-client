@@ -3,6 +3,8 @@
 Library for interfacing with Rockfield's Mercuto public API.
 This library is in an early development state and is subject to major structural changes at any time.
 
+(Visit our Github Repository)[https://github.com/RockfieldTechnologiesAustralia/mercuto-client]
+
 ## Installation
 Install from PyPi: `pip install mercuto-client` or adding the same line into your `requirements.txt`.
 
