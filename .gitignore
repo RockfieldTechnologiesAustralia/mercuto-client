@@ -33,3 +33,6 @@ website/app/pages/test.vue
 website/nuxt.config.ts
 website/package.json
 .cache/
+
+# UV files
+uv.lock
