@@ -20,10 +20,11 @@ classifiers = [
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
 ]
-[urls]
-homepage = "https://mercuto.rockfieldcloud.com.au"
-repository = "https://github.com/RockfieldTechnologiesAustralia/mercuto-client"
-documentation = "https://github.com/RockfieldTechnologiesAustralia/mercuto-client/blob/main/README.md"
+
+[project.urls]
+Homepage = "https://mercuto.rockfieldcloud.com.au"
+Repository = "https://github.com/RockfieldTechnologiesAustralia/mercuto-client"
+Documentation = "https://github.com/RockfieldTechnologiesAustralia/mercuto-client/blob/main/README.md"
 
 [dependency-groups]
 tests = [
