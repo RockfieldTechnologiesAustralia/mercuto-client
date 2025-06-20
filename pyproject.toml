@@ -20,6 +20,9 @@ classifiers = [
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
 ]
+license = "AGPL-3.0-only"
+license-files = ["LICENSE"]
+readme = "README.md"
 
 [project.urls]
 Homepage = "https://mercuto.rockfieldcloud.com.au"
