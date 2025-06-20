@@ -22,4 +22,4 @@ jobs:
           uv build
       - name: Publish to PyPi
         run: |
-          uv publish --repository pypi
+          uv publish
