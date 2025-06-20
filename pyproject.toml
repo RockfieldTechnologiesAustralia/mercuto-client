@@ -5,6 +5,10 @@ description = "Library for interfacing with Rockfield's Mercuto API"
 requires-python = ">=3.10"
 dependencies = [
     'requests>=2.32',
+    "pyftpdlib>=2.0.1",
+    "python-dateutil>=2.9.0.post0",
+    "pytz>=2025.2",
+    "schedule>=1.2.2",
 ]
 version = "0.1.0"
 keywords = ["mercuto", "rockfield", "infratech"]
@@ -22,12 +26,6 @@ repository = "https://github.com/RockfieldTechnologiesAustralia/mercuto-client"
 documentation = "https://github.com/RockfieldTechnologiesAustralia/mercuto-client/blob/main/README.md"
 
 [dependency-groups]
-ingester = [
-    "pyftpdlib>=2.0.1",
-    "python-dateutil>=2.9.0.post0",
-    "pytz>=2025.2",
-    "schedule>=1.2.2",
-]
 tests = [
     "types-requests>=2.32.4.20250611",
     "freezegun>=1.5.2",
@@ -37,10 +35,6 @@ tests = [
     "flake8>=7.2.0",
     "mypy>=1.16.1",
     "isort>=6.0.1",
-    "schedule>=1.2.2",
-    "python-dateutil>=2.9.0.post0",
-    "pytz>=2025.2",
-    "pyftpdlib>=2.0.1",
 ]
 
 [build-system]
