@@ -10,7 +10,7 @@ dependencies = [
     "pytz>=2025.2",
     "schedule>=1.2.2",
 ]
-version = "0.1.0"
+version = "REPLACE_WITH_VERSION_IN_GITHUB_WORKFLOW"
 keywords = ["mercuto", "rockfield", "infratech"]
 classifiers = [
   "Development Status :: 3 - Alpha",
