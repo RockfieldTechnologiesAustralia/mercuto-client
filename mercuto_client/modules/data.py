@@ -1,5 +1,4 @@
 import enum
-import itertools
 import os
 import time
 from contextlib import nullcontext
@@ -10,6 +9,7 @@ from typing import (TYPE_CHECKING, Any, BinaryIO, Collection, Literal,
 from pydantic import TypeAdapter
 
 from ..exceptions import MercutoClientException, MercutoHTTPException
+from ..util import batched
 from . import _PayloadType, _raise_for_response
 from ._util import BaseModel, serialise_timedelta
 
@@ -497,7 +497,7 @@ class MercutoDataService:
         """
         Insert secondary samples.
         """
-        for batch in itertools.batched(samples, 5000):
+        for batch in batched(samples, 5000):
             payload = _SecondarySamplelistAdapter.dump_python(list(batch), mode='json')
             self._client._http_request(
                 f'{self._path}/samples/secondary', 'PUT', json=payload, params={"project": project}
@@ -513,7 +513,7 @@ class MercutoDataService:
         """
         Insert metric samples.
         """
-        for batch in itertools.batched(samples, 5000):
+        for batch in batched(samples, 5000):
             payload = _MetricSamplelistAdapter.dump_python(list(batch), mode='json')
             self._client._http_request(
                 f'{self._path}/samples/metric', 'PUT', json=payload, params={"project": project}
