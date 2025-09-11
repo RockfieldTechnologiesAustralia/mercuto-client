@@ -16,7 +16,7 @@ Use the `connect()` function exposed within the main package and provide your AP
 from mercuto_client import connect
 
 client = connect(api_key="<YOUR API KEY>")
-print(client.projects().get_projects())
+print(client.core().list_projects())
 
 # Logout after finished.
 client.logout()
@@ -29,7 +29,7 @@ You can also use the client as a context manager. It will logout automatically.
 from mercuto_client import MercutoClient
 
 with MercutoClient.as_credentials(api_key='<YOUR API KEY>') as client:
-    print(client.projects().get_projects())
+    print(client.core().list_projects())
 ```
 
 ## Current Status
@@ -37,3 +37,9 @@ This library is incomplete and may not be fully compliant with the latest Mercut
 
 - [x] API Based login (Completed)
 - [ ] Username/password login
+
+## Running tests
+Install test packages:
+`python -m uv sync --group tests`
+Run tests:
+`uv run pytest`

@@ -2,7 +2,7 @@ from typing import Optional, Protocol
 
 import pytz
 
-from ...types import DataSample
+from ...modules.data import SecondaryDataSample
 from .campbell import parse_campbell_file
 from .worldsensing import (parse_worldsensing_compact_file,
                            parse_worldsensing_standard_file)
@@ -10,9 +10,9 @@ from .worldsensing import (parse_worldsensing_compact_file,
 
 class Parser(Protocol):
     def __call__(self, filename: str, label_to_channel_code: dict[str, str],
-                 timezone: Optional[pytz.BaseTzInfo] = None) -> list[DataSample]:
+                 timezone: Optional[pytz.BaseTzInfo] = None) -> list[SecondaryDataSample]:
         """
-        Parse the file and return a list of DataSample objects.
+        Parse the file and return a list of SecondaryDataSample objects.
         """
         pass
 
