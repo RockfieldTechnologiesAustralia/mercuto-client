@@ -8,10 +8,10 @@ from typing import Callable, TypeVar
 
 import schedule
 
+from ..util import get_free_space_excluding_files
 from .ftp import simple_ftp_server
 from .mercuto import MercutoIngester
 from .processor import FileProcessor
-from .util import get_free_space_excluding_files
 
 logger = logging.getLogger(__name__)
 

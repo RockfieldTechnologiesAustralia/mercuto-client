@@ -1,4 +1,5 @@
 import json
+from typing import Any
 
 
 class MercutoClientException(Exception):
@@ -11,5 +12,8 @@ class MercutoHTTPException(MercutoClientException):
         self.status_code = status_code
         self.message = message
 
-    def json(self) -> dict:
+    def json(self) -> Any:
         return json.loads(self.message)
+
+    def __str__(self) -> str:
+        return f"MercutoHTTPException(status_code='{self.status_code}', message='{self.message}')"
