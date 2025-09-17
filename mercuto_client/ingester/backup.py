@@ -4,7 +4,7 @@ import os
 import shutil
 from dataclasses import dataclass
 from pathlib import Path, PosixPath
-from typing import Callable, Optional, Dict, Any
+from typing import Any, Callable, Dict, Optional
 from urllib.parse import ParseResult, parse_qs, unquote
 
 import paramiko
