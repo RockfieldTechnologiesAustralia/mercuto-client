@@ -73,6 +73,9 @@ def main():
     parser.add_argument('--no-rename', action='store_true',
                         help='Add the current timestamp to the end of the files received via FTP. \
                         This is useful to avoid overwriting files with the same name.')
+    parser.add_argument('-i', '--insecure', action="store_true",
+                        help='Disable SSL verification',
+                        default=False)
 
     args = parser.parse_args()
 
@@ -137,7 +140,9 @@ def main():
     ingester = MercutoIngester(
         project_code=args.project,
         api_key=args.api_key,
-        hostname=args.hostname)
+        hostname=args.hostname,
+        verify_ssl=not args.insecure,
+    )
 
     ingester.update_mapping(mapping)
 

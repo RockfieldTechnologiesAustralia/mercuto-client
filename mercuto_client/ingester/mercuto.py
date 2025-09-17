@@ -15,8 +15,8 @@ NON_RETRYABLE_ERRORS = {400, 404, 409}  # HTTP status codes that indicate non-re
 
 
 class MercutoIngester:
-    def __init__(self, project_code: str, api_key: str, hostname: str = 'https://api.rockfieldcloud.com.au') -> None:
-        self._client = MercutoClient(url=hostname)
+    def __init__(self, project_code: str, api_key: str, hostname: str = 'https://api.rockfieldcloud.com.au', verify_ssl: bool = True) -> None:
+        self._client = MercutoClient(url=hostname, verify_ssl=verify_ssl)
         self._api_key = api_key
         self._project_code = project_code
 
