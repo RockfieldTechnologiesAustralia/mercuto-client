@@ -30,7 +30,7 @@ def call_and_log_error(func: Callable[[], T]) -> T | None:
         return None
 
 
-if __name__ == '__main__':
+def main():
     parser = argparse.ArgumentParser(description='Mercuto Ingester CLI')
     parser.add_argument('-p', '--project', type=str,
                         required=True, help='Mercuto project code')
@@ -161,3 +161,6 @@ if __name__ == '__main__':
         while True:
             schedule.run_pending()
             time.sleep(0.5)
+
+if __name__ == '__main__':
+    main()

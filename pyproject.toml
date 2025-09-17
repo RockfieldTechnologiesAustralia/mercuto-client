@@ -50,3 +50,6 @@ mercuto_client = ["py.typed"]
 
 [tool.mypy]
 strict = false
+
+[project.scripts]
+mc-ftp-ingester = "mercuto_client.ingester.__main__:main"
