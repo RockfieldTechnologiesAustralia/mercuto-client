@@ -159,6 +159,7 @@ def main():
                            username=args.username, password=args.password, port=args.port,
                            callback=processor.add_file_to_db, rename=not args.no_rename,
                            workdir=ftp_dir):
+        call_and_log_error(ingester.ping)
         schedule.every(60).seconds.do(call_and_log_error, ingester.ping)
         schedule.every(5).seconds.do(call_and_log_error, processor.process_next_file)
         schedule.every(2).minutes.do(call_and_log_error, processor.cleanup_old_files)
