@@ -166,7 +166,11 @@ def main():
 
         while True:
             schedule.run_pending()
-            time.sleep(0.5)
+            sleep_period = schedule.idle_seconds()
+            if sleep_period is None or sleep_period < 0:
+                sleep_period = 0
+            time.sleep(sleep_period)
+
 
 if __name__ == '__main__':
     main()
