@@ -4,9 +4,12 @@ import logging.handlers
 import os
 import sys
 import time
-from typing import Callable, TypeVar
+from typing import Callable, List, TypeVar
+from urllib.parse import urlparse
 
 import schedule
+
+from mercuto_client.ingester.backup import get_backup_handler
 
 from .ftp import simple_ftp_server
 from .mercuto import MercutoIngester
@@ -76,6 +79,10 @@ def main():
     parser.add_argument('-i', '--insecure', action="store_true",
                         help='Disable SSL verification',
                         default=False)
+    parser.add_argument('-b', '--backup_location', action="append",
+                        help='Backup location to store ingested files.',
+                        type=urlparse
+                        )
 
     args = parser.parse_args()
 
@@ -145,11 +152,19 @@ def main():
     )
 
     ingester.update_mapping(mapping)
+    if args.backup_location is None:
+        args.backup_location = []
+
+    pre_processing_handlers: List[Callable[[str], bool]] = [get_backup_handler(loc) for loc in args.backup_location]
+    processor_callbacks: List[Callable[[str], bool]] = [ingester.process_file]
+    post_processing_handlers: List[Callable[[str], bool]] = []
+
+    all_handlers = pre_processing_handlers + processor_callbacks + post_processing_handlers
 
     processor = FileProcessor(
         buffer_dir=buffer_directory,
         db_path=database_path,
-        process_callback=ingester.process_file,
+        process_callback=lambda filename: all(handler(filename) for handler in all_handlers),
         max_attempts=args.max_attempts,
         free_space_mb=size)
 

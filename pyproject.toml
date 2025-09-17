@@ -9,6 +9,7 @@ dependencies = [
     "python-dateutil>=2.9.0.post0",
     "pytz>=2025.2",
     "schedule>=1.2.2",
+    'pydantic>=2.0'
 ]
 version = "0.0.0"  # This will be replaced by the workflow
 keywords = ["mercuto", "rockfield", "infratech"]
@@ -39,6 +40,9 @@ tests = [
     "flake8>=7.2.0",
     "mypy>=1.16.1",
     "isort>=6.0.1",
+    "pandas>=2.3.2",
+    "mock-ssh-server>=0.9.1",
+    "types-paramiko>=4.0.0.20250822"
 ]
 
 [build-system]
