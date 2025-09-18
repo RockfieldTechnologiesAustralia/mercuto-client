@@ -2,14 +2,17 @@ import argparse
 import logging
 import logging.handlers
 import os
+import signal
 import sys
 import time
+from multiprocessing import Value
 from typing import Callable, List, TypeVar
 from urllib.parse import urlparse
 
 import schedule
 
 from mercuto_client.ingester.backup import get_backup_handler
+from mercuto_client.ingester.pid_file import PidFile
 
 from .ftp import simple_ftp_server
 from .mercuto import MercutoIngester
@@ -83,108 +86,124 @@ def main():
                         help='Backup location to store ingested files.',
                         type=urlparse
                         )
+    parser.add_argument('-e', '--pid-file', help='Ths location to create the PID file', default=None)
 
     args = parser.parse_args()
 
-    if args.workdir is None:
-        workdir = os.path.join(os.path.expanduser('~'), ".mercuto-ingester")
-    else:
-        workdir = args.workdir
-        if not os.path.exists(args.workdir):
-            raise ValueError(f"Work directory {args.workdir} does not exist")
-    os.makedirs(workdir, exist_ok=True)
+    with PidFile(args.pid_file):
 
-    if args.verbose:
-        level = logging.DEBUG
-    else:
-        level = logging.INFO
+        if args.workdir is None:
+            workdir = os.path.join(os.path.expanduser('~'), ".mercuto-ingester")
+        else:
+            workdir = args.workdir
+            if not os.path.exists(args.workdir):
+                raise ValueError(f"Work directory {args.workdir} does not exist")
+        os.makedirs(workdir, exist_ok=True)
 
-    handlers: list[logging.Handler] = []
-    handlers.append(logging.StreamHandler(sys.stderr))
+        if args.verbose:
+            level = logging.DEBUG
+        else:
+            level = logging.INFO
 
-    if args.logfile is not None:
-        logfile = args.logfile
-    else:
-        logfile = os.path.join(workdir, 'log.txt')
-    handlers.append(logging.handlers.RotatingFileHandler(
-        logfile, maxBytes=1000000, backupCount=3))
+        handlers: list[logging.Handler] = []
+        handlers.append(logging.StreamHandler(sys.stderr))
 
-    logging.basicConfig(format='[PID %(process)d] %(asctime)s,%(msecs)d %(name)s %(levelname)s %(message)s',
-                        datefmt='%d/%m/%Y %H:%M:%S',
-                        level=level,
-                        handlers=handlers)
+        if args.logfile is not None:
+            logfile = args.logfile
+        else:
+            logfile = os.path.join(workdir, 'log.txt')
+        handlers.append(logging.handlers.RotatingFileHandler(
+            logfile, maxBytes=1000000, backupCount=3))
 
-    if args.directory is None:
-        buffer_directory = os.path.join(workdir, "buffered-files")
-    else:
-        buffer_directory = args.directory
-    os.makedirs(buffer_directory, exist_ok=True)
+        logging.basicConfig(format='[PID %(process)d] %(asctime)s,%(msecs)d %(name)s %(levelname)s %(message)s',
+                            datefmt='%d/%m/%Y %H:%M:%S',
+                            level=level,
+                            handlers=handlers)
 
-    ftp_dir = os.path.join(workdir, 'temp-ftp-data')
-    os.makedirs(ftp_dir, exist_ok=True)
+        if args.directory is None:
+            buffer_directory = os.path.join(workdir, "buffered-files")
+        else:
+            buffer_directory = args.directory
+        os.makedirs(buffer_directory, exist_ok=True)
 
-    size = args.size
-    if size is None:
-        size = get_free_space_excluding_files(buffer_directory) * 0.75 // (1024 * 1024)  # Convert to MB
-        logging.info(f"Buffer size set to {size} MB based on available disk space.")
+        ftp_dir = os.path.join(workdir, 'temp-ftp-data')
+        os.makedirs(ftp_dir, exist_ok=True)
 
-    if args.mapping is not None:
-        import json
-        with open(args.mapping, 'r') as f:
-            mapping = json.load(f)
-        if not isinstance(mapping, dict):
-            raise ValueError(f"Mapping file {args.mapping} must contain a JSON object")
-    else:
-        mapping = {}
+        size = args.size
+        if size is None:
+            size = get_free_space_excluding_files(buffer_directory) * 0.75 // (1024 * 1024)  # Convert to MB
+            logging.info(f"Buffer size set to {size} MB based on available disk space.")
 
-    logger.info(f"Using work directory: {workdir}")
+        if args.mapping is not None:
+            import json
+            with open(args.mapping, 'r') as f:
+                mapping = json.load(f)
+            if not isinstance(mapping, dict):
+                raise ValueError(f"Mapping file {args.mapping} must contain a JSON object")
+        else:
+            mapping = {}
 
-    database_path = os.path.join(workdir, "buffer.db")
-    if args.clean and os.path.exists(database_path):
-        logging.info(f"Dropping existing database at {database_path}")
-        os.remove(database_path)
+        logger.info(f"Using work directory: {workdir}")
 
-    ingester = MercutoIngester(
-        project_code=args.project,
-        api_key=args.api_key,
-        hostname=args.hostname,
-        verify_ssl=not args.insecure,
-    )
+        database_path = os.path.join(workdir, "buffer.db")
+        if args.clean and os.path.exists(database_path):
+            logging.info(f"Dropping existing database at {database_path}")
+            os.remove(database_path)
 
-    ingester.update_mapping(mapping)
-    if args.backup_location is None:
-        args.backup_location = []
+        ingester = MercutoIngester(
+            project_code=args.project,
+            api_key=args.api_key,
+            hostname=args.hostname,
+            verify_ssl=not args.insecure,
+        )
 
-    pre_processing_handlers: List[Callable[[str], bool]] = [get_backup_handler(loc) for loc in args.backup_location]
-    processor_callbacks: List[Callable[[str], bool]] = [ingester.process_file]
-    post_processing_handlers: List[Callable[[str], bool]] = []
+        ingester.update_mapping(mapping)
+        if args.backup_location is None:
+            args.backup_location = []
 
-    all_handlers = pre_processing_handlers + processor_callbacks + post_processing_handlers
+        pre_processing_handlers: List[Callable[[str], bool]] = [get_backup_handler(loc) for loc in args.backup_location]
+        processor_callbacks: List[Callable[[str], bool]] = [ingester.process_file]
+        post_processing_handlers: List[Callable[[str], bool]] = []
 
-    processor = FileProcessor(
-        buffer_dir=buffer_directory,
-        db_path=database_path,
-        process_callback=lambda filename: all(handler(filename) for handler in all_handlers),
-        max_attempts=args.max_attempts,
-        free_space_mb=size)
+        all_handlers = pre_processing_handlers + processor_callbacks + post_processing_handlers
 
-    processor.scan_existing_files()
+        processor = FileProcessor(
+            buffer_dir=buffer_directory,
+            db_path=database_path,
+            process_callback=lambda filename: all(handler(filename) for handler in all_handlers),
+            max_attempts=args.max_attempts,
+            free_space_mb=size)
 
-    with simple_ftp_server(directory=buffer_directory,
-                           username=args.username, password=args.password, port=args.port,
-                           callback=processor.add_file_to_db, rename=not args.no_rename,
-                           workdir=ftp_dir):
-        call_and_log_error(ingester.ping)
-        schedule.every(60).seconds.do(call_and_log_error, ingester.ping)
-        schedule.every(5).seconds.do(call_and_log_error, processor.process_next_file)
-        schedule.every(2).minutes.do(call_and_log_error, processor.cleanup_old_files)
+        processor.scan_existing_files()
 
-        while True:
-            schedule.run_pending()
-            sleep_period = schedule.idle_seconds()
-            if sleep_period is None or sleep_period < 0:
-                sleep_period = 0
-            time.sleep(sleep_period)
+        with simple_ftp_server(directory=buffer_directory,
+                               username=args.username, password=args.password, port=args.port,
+                               callback=processor.add_file_to_db, rename=not args.no_rename,
+                               workdir=ftp_dir):
+            call_and_log_error(ingester.ping)
+            schedule.every(60).seconds.do(call_and_log_error, ingester.ping)
+            schedule.every(5).seconds.do(call_and_log_error, processor.process_next_file)
+            schedule.every(2).minutes.do(call_and_log_error, processor.cleanup_old_files)
+
+            running = Value('i', 1)
+            def hdl(sig, frame):
+                running.value = 0
+                logger.info(f"Closing connection to {args.hostname}:{args.port}")
+
+            signal.signal(signal.SIGTERM, hdl)
+            signal.signal(signal.SIGINT, hdl)
+
+            while running.value == 1:
+                schedule.run_pending()
+                sleep_period = schedule.idle_seconds()
+                if sleep_period is None or sleep_period < 0:
+                    sleep_period = 0
+                # We need to wake up to handle ctrl-c etc
+                if sleep_period > 1:
+                    sleep_period = 1
+                time.sleep(sleep_period)
+
+            logger.warning(f"Shutting Down...")
 
 
 if __name__ == '__main__':
