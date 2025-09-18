@@ -1,8 +1,10 @@
+import argparse
 import atexit
 import logging
+import sys
 from pathlib import Path
 
-from zc.lockfile import LockFile  # type: ignore[import-untyped]
+from zc.lockfile import LockFile, LockError  # type: ignore[import-untyped]
 
 logger = logging.getLogger(__name__)
 
@@ -30,3 +32,27 @@ class PidFile:
             self.lock = None
             self.__cleanup()
             atexit.unregister(self.__cleanup)
+
+def main():
+    locked=1
+    unlocked=0
+    parser = argparse.ArgumentParser()
+    parser.add_argument('pidfile', type=Path)
+
+    args = parser.parse_args()
+    if args.pidfile.exists():
+        try:
+            lock = LockFile(args.pidfile)
+            lock.close()
+            print(f"pid file '{args.pidfile}' is not locked", file=sys.stderr)
+
+        except LockError:
+            print(f"pid file '{args.pidfile}' is locked", file=sys.stderr)
+            sys.exit(locked)
+
+    else:
+        print(f"pid file '{args.pidfile}' does not exist", file=sys.stderr)
+    sys.exit(unlocked)
+
+if __name__ == '__main__':
+    main()
