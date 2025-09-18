@@ -186,6 +186,7 @@ def main():
             schedule.every(2).minutes.do(call_and_log_error, processor.cleanup_old_files)
 
             running = Value('i', 1)
+
             def hdl(sig, frame):
                 running.value = 0
                 logger.info(f"Closing connection to {args.hostname}:{args.port}")
@@ -203,7 +204,7 @@ def main():
                     sleep_period = 1
                 time.sleep(sleep_period)
 
-            logger.warning(f"Shutting Down...")
+            logger.warning("Shutting Down...")
 
 
 if __name__ == '__main__':

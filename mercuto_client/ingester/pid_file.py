@@ -2,9 +2,10 @@ import atexit
 import logging
 from pathlib import Path
 
-from zc.lockfile import LockFile
+from zc.lockfile import LockFile  # type: ignore[import-untyped]
 
 logger = logging.getLogger(__name__)
+
 
 class PidFile:
     def __init__(self, lock_file: Path | None = None, content_template='{pid}'):
@@ -29,6 +30,3 @@ class PidFile:
             self.lock = None
             self.__cleanup()
             atexit.unregister(self.__cleanup)
-
-
-
