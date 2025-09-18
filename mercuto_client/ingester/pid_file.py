@@ -33,9 +33,10 @@ class PidFile:
             self.__cleanup()
             atexit.unregister(self.__cleanup)
 
+
 def main():
-    locked=1
-    unlocked=0
+    locked = 1
+    unlocked = 0
     parser = argparse.ArgumentParser()
     parser.add_argument('pidfile', type=Path)
 
@@ -53,6 +54,7 @@ def main():
     else:
         print(f"pid file '{args.pidfile}' does not exist", file=sys.stderr)
     sys.exit(unlocked)
+
 
 if __name__ == '__main__':
     main()
