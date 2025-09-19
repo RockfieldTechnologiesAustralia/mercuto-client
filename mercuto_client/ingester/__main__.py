@@ -5,7 +5,6 @@ import os
 import signal
 import sys
 import time
-from multiprocessing import Value
 from typing import Callable, List, TypeVar
 from urllib.parse import urlparse
 
@@ -45,7 +44,6 @@ class Status:
         print("Stopping")
 
     def is_running(self):
-        print(self.running)
         return self.running
 
 
