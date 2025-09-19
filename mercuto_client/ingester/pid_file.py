@@ -35,8 +35,8 @@ class PidFile:
 
 
 def main():
-    locked = 1
-    unlocked = 0
+    locked = 0
+    unlocked = 1
     parser = argparse.ArgumentParser()
     parser.add_argument('pidfile', type=Path)
 
