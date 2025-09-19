@@ -80,7 +80,7 @@ class CSCPBackup(Backup):
         return False
 
     def send_file(self, filename: str) -> bool:
-        command = ['scp']
+        command = ['scp', '-oBatchMode=yes']
         dest = ""
         if self.url.username is not None:
             dest = f"{self.url.username}@"
@@ -122,7 +122,7 @@ class CSCPBackup(Backup):
         elif self.params.script is None:
             return True
         else:
-            command = ['ssh']
+            command = ['ssh', '-oBatchMode=yes']
             if self.url.username is not None:
                 command.append('-l')
                 command.append(self.url.username)
