@@ -36,6 +36,19 @@ def call_and_log_error(func: Callable[[], T]) -> T | None:
         return None
 
 
+class Status:
+    def __init__(self):
+        self.running = True
+
+    def stop(self, code, frame):
+        self.running = False
+        print("Stopping")
+
+    def is_running(self):
+        print(self.running)
+        return self.running
+
+
 def main():
     parser = argparse.ArgumentParser(description='Mercuto Ingester CLI')
     parser.add_argument('-p', '--project', type=str,
@@ -185,16 +198,11 @@ def main():
             schedule.every(5).seconds.do(call_and_log_error, processor.process_next_file)
             schedule.every(2).minutes.do(call_and_log_error, processor.cleanup_old_files)
 
-            running = Value('i', 1)
+            status = Status()
+            signal.signal(signal.SIGTERM, status.stop)
+            signal.signal(signal.SIGINT, status.stop)
 
-            def hdl(sig, frame):
-                running.value = 0
-                logger.info(f"Closing connection to {args.hostname}:{args.port}")
-
-            signal.signal(signal.SIGTERM, hdl)
-            signal.signal(signal.SIGINT, hdl)
-
-            while running.value == 1:
+            while status.is_running():
                 schedule.run_pending()
                 sleep_period = schedule.idle_seconds()
                 if sleep_period is None or sleep_period < 0:
