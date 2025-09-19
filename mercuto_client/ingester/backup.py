@@ -199,8 +199,8 @@ def get_backup_handler(url: ParseResult) -> Callable[[str], bool]:
     match url.scheme.lower():
         case "file":
             return FileBackup(url)
-        case "scp":
-            return SCPBackup(url)
+        # case "scp":
+        #     return SCPBackup(url)
         case "cscp":
             return CSCPBackup(url)
 
