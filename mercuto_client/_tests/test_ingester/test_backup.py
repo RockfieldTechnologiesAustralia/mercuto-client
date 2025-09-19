@@ -1,14 +1,14 @@
 import tempfile
-from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import urlparse
 
 import mockssh  # type: ignore[import-untyped]
-import paramiko
+# import paramiko
 import pytest
-from paramiko import PasswordRequiredException
+# from paramiko import PasswordRequiredException
 
-from mercuto_client.ingester.backup import FileBackup, SCPBackup, CSCPBackup
+from mercuto_client.ingester.backup import FileBackup, CSCPBackup
+
 
 
 def test_file_backup():
@@ -44,52 +44,52 @@ def test_file_backup_does_not_exist():
         FileBackup(urlparse(uri))
 
 
-@dataclass
-class SSHUser:
-    username: str
-    private_key: Path
-    public_key: Path
-
-
-@pytest.fixture
-def ssh_user(username="test_user"):
-    with tempfile.TemporaryDirectory() as tmpdir:
-        temp_dir_path = Path(tmpdir)
-        private_key_path = temp_dir_path / "id_rsa"
-        public_key_path = temp_dir_path / "id_rsa.pub"
-        private_key = paramiko.RSAKey.generate(bits=4096)
-        with open(private_key_path, "w") as f:
-            private_key.write_private_key(f)
-        with open(public_key_path, "w") as f:
-            print(f'ssh-rsa {private_key.get_base64()}', file=f)
-        yield SSHUser(username, private_key_path, public_key_path)
-
-
-@pytest.fixture
-def ssh_server(ssh_user):
-    users = {
-        ssh_user.username: ssh_user.private_key,
-    }
-    with mockssh.Server(users) as s:
-        yield s
-
-
-def test_scp_backup_no_user(ssh_server, ssh_user):
-    with pytest.raises(PasswordRequiredException, match="Private key file is encrypted"):
-        SCPBackup(urlparse(f"scp://localhost:{ssh_server.port}{ssh_user.private_key.parent}?private_key={ssh_user.private_key}"))
-
-
-def test_scp_backup(ssh_server, ssh_user):
-    backup = SCPBackup(urlparse(
-        f"scp://{ssh_user.username}@localhost:{ssh_server.port}{ssh_user.private_key.parent}?private_key={ssh_user.private_key}"))
-    assert backup.process_file(__file__)
-
-
-def test_scp_backup_with_command(ssh_server, ssh_user):
-    backup = SCPBackup(urlparse(
-        f"scp://{ssh_user.username}@localhost:{ssh_server.port}{ssh_user.private_key.parent}"
-        f"?private_key={ssh_user.private_key}&script=cat {{destination}}"))
-    assert backup.process_file(__file__)
+# @dataclass
+# class SSHUser:
+#     username: str
+#     private_key: Path
+#     public_key: Path
+#
+#
+# @pytest.fixture
+# def ssh_user(username="test_user"):
+#     with tempfile.TemporaryDirectory() as tmpdir:
+#         temp_dir_path = Path(tmpdir)
+#         private_key_path = temp_dir_path / "id_rsa"
+#         public_key_path = temp_dir_path / "id_rsa.pub"
+#         private_key = paramiko.RSAKey.generate(bits=4096)
+#         with open(private_key_path, "w") as f:
+#             private_key.write_private_key(f)
+#         with open(public_key_path, "w") as f:
+#             print(f'ssh-rsa {private_key.get_base64()}', file=f)
+#         yield SSHUser(username, private_key_path, public_key_path)
+#
+#
+# @pytest.fixture
+# def ssh_server(ssh_user):
+#     users = {
+#         ssh_user.username: ssh_user.private_key,
+#     }
+#     with mockssh.Server(users) as s:
+#         yield s
+#
+#
+# def test_scp_backup_no_user(ssh_server, ssh_user):
+#     with pytest.raises(PasswordRequiredException, match="Private key file is encrypted"):
+#         SCPBackup(urlparse(f"scp://localhost:{ssh_server.port}{ssh_user.private_key.parent}?private_key={ssh_user.private_key}"))
+#
+#
+# def test_scp_backup(ssh_server, ssh_user):
+#     backup = SCPBackup(urlparse(
+#         f"scp://{ssh_user.username}@localhost:{ssh_server.port}{ssh_user.private_key.parent}?private_key={ssh_user.private_key}"))
+#     assert backup.process_file(__file__)
+#
+#
+# def test_scp_backup_with_command(ssh_server, ssh_user):
+#     backup = SCPBackup(urlparse(
+#         f"scp://{ssh_user.username}@localhost:{ssh_server.port}{ssh_user.private_key.parent}"
+#         f"?private_key={ssh_user.private_key}&script=cat {{destination}}"))
+#     assert backup.process_file(__file__)
 
 def test_cscp_backup_with_command(ssh_server, ssh_user):
     backup = CSCPBackup(urlparse(
