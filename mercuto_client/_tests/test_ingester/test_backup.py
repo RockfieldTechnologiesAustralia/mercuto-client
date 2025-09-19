@@ -8,7 +8,7 @@ import paramiko
 import pytest
 from paramiko import PasswordRequiredException
 
-from mercuto_client.ingester.backup import FileBackup, SCPBackup
+from mercuto_client.ingester.backup import FileBackup, SCPBackup, CSCPBackup
 
 
 def test_file_backup():
@@ -89,4 +89,10 @@ def test_scp_backup_with_command(ssh_server, ssh_user):
     backup = SCPBackup(urlparse(
         f"scp://{ssh_user.username}@localhost:{ssh_server.port}{ssh_user.private_key.parent}"
         f"?private_key={ssh_user.private_key}&script=cat {{destination}}"))
+    assert backup.process_file(__file__)
+
+def test_cscp_backup_with_command(ssh_server, ssh_user):
+    backup = CSCPBackup(urlparse(
+        f"cscp://localhost:{ssh_user.private_key.parent}"
+        f"?script=cat {{destination}}"))
     assert backup.process_file(__file__)

@@ -2,6 +2,9 @@ import getpass
 import logging
 import os
 import shutil
+import subprocess
+import sys
+import time
 from dataclasses import dataclass
 from pathlib import Path, PosixPath
 from typing import Any, Callable, Dict, Optional
@@ -164,6 +167,104 @@ class SCPBackup(Backup):
         return True
 
 
+class CSCPBackup(Backup):
+    def __init__(self, url: ParseResult):
+        self.params: Optional[SCPBackupParams] = None
+        super().__init__(url)
+
+    def validate_url(self):
+        query = self.decode_query()
+        self.params = SCPBackupParams.load_qs(query)
+
+    def process_file(self, filename: str) -> bool:
+        if self.send_file(filename):
+            return self.run_script(filename)
+
+        return False
+
+    def send_file(self, filename: str) -> bool:
+        command = ['scp']
+        dest = ""
+        if self.url.username is not None:
+            dest = f"{self.url.username}@"
+
+        dest = f'{dest}{self.url.hostname}'
+
+        port=22
+        if self.url.port is not None:
+            port = self.url.port
+
+        command.append('-P')
+        command.append(str(port))
+
+
+        if self.params is not None:
+            if self.params.private_key is not None:
+                command.append('-i')
+                command.append(str(self.params.private_key))
+
+        dest = f'{dest}:{self.url.path}'
+
+        command.append(filename)
+        command.append(dest)
+
+        try:
+            logger.debug(f'Copy Command: {" ".join(command)}')
+            result = subprocess.run(command, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            logger.debug(f"STDOUT: {result.stdout.decode("utf-8", errors='ignore')}")
+            logger.debug(f"STDERR: {result.stderr.decode("utf-8", errors='ignore')}")
+            return result.returncode == 0
+
+        except subprocess.CalledProcessError as e:
+            print(e.stdout.decode("utf-8"), file=sys.stderr)
+            print(e.stderr.decode("utf-8"), file=sys.stderr)
+            return False
+
+
+    def run_script(self, filename):
+        if self.params is None:
+            return True
+        elif self.params.script is None:
+            return True
+        else:
+            command = ['ssh']
+            if self.url.username is not None:
+                command.append('-l')
+                command.append(self.url.username)
+
+            port = 22
+            if self.url.port is not None:
+                port = self.url.port
+
+            command.append('-p')
+            command.append(str(port))
+
+            if self.params is not None:
+                if self.params.private_key is not None:
+                    command.append('-i')
+                    command.append(str(self.params.private_key))
+
+            command.append(self.url.hostname)
+
+            dest_folder = PosixPath(self.url.path)
+            fn = Path(filename)
+
+            command.append(self.params.script.format(destination=dest_folder / fn.name))
+            logger.debug(f'Script Command: {" ".join(command)}')
+        try:
+            logger.debug(f'Script Command: {" ".join(command)}')
+            result = subprocess.run(command, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            logger.debug(f"STDOUT: {result.stdout.decode("utf-8", errors='ignore')}")
+            logger.debug(f"STDERR: {result.stderr.decode("utf-8", errors='ignore')}")
+            return result.returncode == 0
+
+        except subprocess.CalledProcessError as e:
+            print(e.stdout.decode("utf-8"), file=sys.stderr)
+            print(e.stderr.decode("utf-8"), file=sys.stderr)
+            return False
+
+
+
 class FileBackup(Backup):
     def __init__(self, url: ParseResult):
         self.backup_path: Optional[Path] = None
@@ -207,5 +308,8 @@ def get_backup_handler(url: ParseResult) -> Callable[[str], bool]:
             return FileBackup(url)
         case "scp":
             return SCPBackup(url)
+        case "cscp":
+            return CSCPBackup(url)
+
         case _:
             raise RuntimeError(f"Unsupported scheme: {url.scheme}")
