@@ -198,7 +198,6 @@ def main():
 
             status = Status()
             signal.signal(signal.SIGTERM, status.stop)
-            signal.signal(signal.SIGINT, status.stop)
 
             while status.is_running():
                 schedule.run_pending()
