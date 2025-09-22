@@ -5,7 +5,7 @@ import os
 import signal
 import sys
 import time
-from typing import Callable, List, TypeVar
+from typing import Callable, List, TypeVar, Optional
 from urllib.parse import urlparse
 
 import schedule
@@ -45,6 +45,141 @@ class Status:
 
     def is_running(self):
         return self.running
+
+def launch_mercuto_ingester(
+            project: str,
+            api_key: str,
+            hostname: str = 'https://api.rockfieldcloud.com.au',
+            verify_ssl: bool = True,
+            pid_file = None,
+            workdir: Optional[str] = '~/.mercuto-ingester',
+            verbose: bool = False,
+            logfile: Optional[str] = None,
+            directory: Optional[str] = None,
+            size: Optional[int] = None,
+            mapping: Optional[str] = None,
+            clean: bool = False,
+            ftp_server_username: str = 'logger',
+            ftp_server_password: str = 'password',
+            ftp_server_port: int = 2121,
+            ftp_server_rename: bool = True,
+            max_attempts: int = 1000,
+            backup_location: Optional[List[str]] = None
+           ):
+
+    if backup_location is None:
+        backup_location = []
+
+    with PidFile(pid_file):
+
+        if workdir is None:
+            workdir = os.path.join(os.path.expanduser('~'), ".mercuto-ingester")
+        elif workdir.startswith("~"):
+            workdir = os.path.expanduser(workdir)
+        else:
+            workdir = workdir
+            if not os.path.exists(workdir):
+                raise ValueError(f"Work directory {workdir} does not exist")
+
+        os.makedirs(workdir, exist_ok=True)
+
+        if verbose:
+            level = logging.DEBUG
+        else:
+            level = logging.INFO
+
+        handlers: list[logging.Handler] = []
+        handlers.append(logging.StreamHandler(sys.stderr))
+
+        if logfile is not None:
+            logfile = logfile
+        else:
+            logfile = os.path.join(workdir, 'log.txt')
+        handlers.append(logging.handlers.RotatingFileHandler(
+            logfile, maxBytes=1000000, backupCount=3))
+
+        logging.basicConfig(format='[PID %(process)d] %(asctime)s,%(msecs)d %(name)s %(levelname)s %(message)s',
+                            datefmt='%d/%m/%Y %H:%M:%S',
+                            level=level,
+                            handlers=handlers)
+
+        if directory is None:
+            buffer_directory = os.path.join(workdir, "buffered-files")
+        else:
+            buffer_directory = directory
+        os.makedirs(buffer_directory, exist_ok=True)
+
+        ftp_dir = os.path.join(workdir, 'temp-ftp-data')
+        os.makedirs(ftp_dir, exist_ok=True)
+
+        size = size
+        if size is None:
+            size = get_free_space_excluding_files(buffer_directory) * 0.75 // (1024 * 1024)  # Convert to MB
+            logging.info(f"Buffer size set to {size} MB based on available disk space.")
+
+        if mapping is not None:
+            import json
+            with open(mapping, 'r') as f:
+                mapping = json.load(f)
+            if not isinstance(mapping, dict):
+                raise ValueError(f"Mapping file {mapping} must contain a JSON object")
+        else:
+            mapping = {}
+
+        logger.info(f"Using work directory: {workdir}")
+
+        database_path = os.path.join(workdir, "buffer.db")
+        if clean and os.path.exists(database_path):
+            logging.info(f"Dropping existing database at {database_path}")
+            os.remove(database_path)
+
+        ingester = MercutoIngester(
+            project_code=project,
+            api_key=api_key,
+            hostname=hostname,
+            verify_ssl=verify_ssl,
+        )
+
+        ingester.update_mapping(mapping)
+
+        pre_processing_handlers: List[Callable[[str], bool]] = [get_backup_handler(loc) for loc in backup_location]
+        processor_callbacks: List[Callable[[str], bool]] = [ingester.process_file]
+        post_processing_handlers: List[Callable[[str], bool]] = []
+
+        all_handlers = pre_processing_handlers + processor_callbacks + post_processing_handlers
+
+        processor = FileProcessor(
+            buffer_dir=buffer_directory,
+            db_path=database_path,
+            process_callback=lambda filename: all(handler(filename) for handler in all_handlers),
+            max_attempts=max_attempts,
+            free_space_mb=size)
+
+        processor.scan_existing_files()
+
+        with simple_ftp_server(directory=buffer_directory,
+                               username=ftp_server_username, password=ftp_server_password, port=ftp_server_port,
+                               callback=processor.add_file_to_db, rename=ftp_server_rename,
+                               workdir=ftp_dir):
+            call_and_log_error(ingester.ping)
+            schedule.every(60).seconds.do(call_and_log_error, ingester.ping)
+            schedule.every(5).seconds.do(call_and_log_error, processor.process_next_file)
+            schedule.every(2).minutes.do(call_and_log_error, processor.cleanup_old_files)
+
+            status = Status()
+            signal.signal(signal.SIGTERM, status.stop)
+
+            while status.is_running():
+                schedule.run_pending()
+                sleep_period = schedule.idle_seconds()
+                if sleep_period is None or sleep_period < 0:
+                    sleep_period = 0
+                # We need to wake up to handle ctrl-c etc
+                if sleep_period > 1:
+                    sleep_period = 1
+                time.sleep(sleep_period)
+
+            logger.warning("Shutting Down...")
 
 
 def main():
@@ -101,115 +236,25 @@ def main():
 
     args = parser.parse_args()
 
-    with PidFile(args.pid_file):
-
-        if args.workdir is None:
-            workdir = os.path.join(os.path.expanduser('~'), ".mercuto-ingester")
-        else:
-            workdir = args.workdir
-            if not os.path.exists(args.workdir):
-                raise ValueError(f"Work directory {args.workdir} does not exist")
-        os.makedirs(workdir, exist_ok=True)
-
-        if args.verbose:
-            level = logging.DEBUG
-        else:
-            level = logging.INFO
-
-        handlers: list[logging.Handler] = []
-        handlers.append(logging.StreamHandler(sys.stderr))
-
-        if args.logfile is not None:
-            logfile = args.logfile
-        else:
-            logfile = os.path.join(workdir, 'log.txt')
-        handlers.append(logging.handlers.RotatingFileHandler(
-            logfile, maxBytes=1000000, backupCount=3))
-
-        logging.basicConfig(format='[PID %(process)d] %(asctime)s,%(msecs)d %(name)s %(levelname)s %(message)s',
-                            datefmt='%d/%m/%Y %H:%M:%S',
-                            level=level,
-                            handlers=handlers)
-
-        if args.directory is None:
-            buffer_directory = os.path.join(workdir, "buffered-files")
-        else:
-            buffer_directory = args.directory
-        os.makedirs(buffer_directory, exist_ok=True)
-
-        ftp_dir = os.path.join(workdir, 'temp-ftp-data')
-        os.makedirs(ftp_dir, exist_ok=True)
-
-        size = args.size
-        if size is None:
-            size = get_free_space_excluding_files(buffer_directory) * 0.75 // (1024 * 1024)  # Convert to MB
-            logging.info(f"Buffer size set to {size} MB based on available disk space.")
-
-        if args.mapping is not None:
-            import json
-            with open(args.mapping, 'r') as f:
-                mapping = json.load(f)
-            if not isinstance(mapping, dict):
-                raise ValueError(f"Mapping file {args.mapping} must contain a JSON object")
-        else:
-            mapping = {}
-
-        logger.info(f"Using work directory: {workdir}")
-
-        database_path = os.path.join(workdir, "buffer.db")
-        if args.clean and os.path.exists(database_path):
-            logging.info(f"Dropping existing database at {database_path}")
-            os.remove(database_path)
-
-        ingester = MercutoIngester(
-            project_code=args.project,
+    launch_mercuto_ingester(
+            project=args.project,
             api_key=args.api_key,
-            hostname=args.hostname,
             verify_ssl=not args.insecure,
-        )
-
-        ingester.update_mapping(mapping)
-        if args.backup_location is None:
-            args.backup_location = []
-
-        pre_processing_handlers: List[Callable[[str], bool]] = [get_backup_handler(loc) for loc in args.backup_location]
-        processor_callbacks: List[Callable[[str], bool]] = [ingester.process_file]
-        post_processing_handlers: List[Callable[[str], bool]] = []
-
-        all_handlers = pre_processing_handlers + processor_callbacks + post_processing_handlers
-
-        processor = FileProcessor(
-            buffer_dir=buffer_directory,
-            db_path=database_path,
-            process_callback=lambda filename: all(handler(filename) for handler in all_handlers),
+            pid_file=args.pid_file,
+            workdir=args.workdir,
+            verbose=args.verbose,
+            logfile=args.logfile,
+            directory=args.directory,
+            size=args.size,
+            mapping=args.mapping,
+            clean=args.clean,
+            ftp_server_username=args.username,
+            ftp_server_password=args.password,
+            ftp_server_port=args.port,
+            ftp_server_rename = not args.no_rename,
             max_attempts=args.max_attempts,
-            free_space_mb=size)
-
-        processor.scan_existing_files()
-
-        with simple_ftp_server(directory=buffer_directory,
-                               username=args.username, password=args.password, port=args.port,
-                               callback=processor.add_file_to_db, rename=not args.no_rename,
-                               workdir=ftp_dir):
-            call_and_log_error(ingester.ping)
-            schedule.every(60).seconds.do(call_and_log_error, ingester.ping)
-            schedule.every(5).seconds.do(call_and_log_error, processor.process_next_file)
-            schedule.every(2).minutes.do(call_and_log_error, processor.cleanup_old_files)
-
-            status = Status()
-            signal.signal(signal.SIGTERM, status.stop)
-
-            while status.is_running():
-                schedule.run_pending()
-                sleep_period = schedule.idle_seconds()
-                if sleep_period is None or sleep_period < 0:
-                    sleep_period = 0
-                # We need to wake up to handle ctrl-c etc
-                if sleep_period > 1:
-                    sleep_period = 1
-                time.sleep(sleep_period)
-
-            logger.warning("Shutting Down...")
+            backup_location=args.backup_location
+    )
 
 
 if __name__ == '__main__':
