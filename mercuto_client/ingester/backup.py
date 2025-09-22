@@ -8,6 +8,8 @@ from pathlib import Path, PosixPath
 from typing import Callable, Optional
 from urllib.parse import ParseResult, parse_qs, unquote
 
+import requests
+
 logger = logging.getLogger(__name__)
 
 
@@ -195,10 +197,25 @@ class FileBackup(Backup):
         return True
 
 
+class HTTPBackup(Backup):
+
+    def process_file(self, filename: str) -> bool:
+        with open(filename, "rb") as f:
+            files = {"file": (Path(filename).name, f, "text/plain")}
+            response = requests.post(self.url.geturl(), files=files)
+            result = response.json().get('result', False)
+            return result
+
+
 def get_backup_handler(url: ParseResult) -> Callable[[str], bool]:
     match url.scheme.lower():
         case "file":
             return FileBackup(url)
+        case "http":
+            return HTTPBackup(url)
+        case "https":
+            return HTTPBackup(url)
+
         # case "scp":
         #     return SCPBackup(url)
         case "cscp":
