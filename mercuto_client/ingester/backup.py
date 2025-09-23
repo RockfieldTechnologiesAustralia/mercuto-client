@@ -218,8 +218,8 @@ def get_backup_handler(url: ParseResult) -> Callable[[str], bool]:
 
         # case "scp":
         #     return SCPBackup(url)
-        case "cscp":
-            return CSCPBackup(url)
+        # case "cscp":
+        #     return CSCPBackup(url)
 
         case _:
             raise RuntimeError(f"Unsupported scheme: {url.scheme}")
