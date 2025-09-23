@@ -46,12 +46,13 @@ class Status:
     def is_running(self):
         return self.running
 
+
 def launch_mercuto_ingester(
             project: str,
             api_key: str,
             hostname: str = 'https://api.rockfieldcloud.com.au',
             verify_ssl: bool = True,
-            pid_file = None,
+            pid_file=None,
             workdir: Optional[str] = '~/.mercuto-ingester',
             verbose: bool = False,
             logfile: Optional[str] = None,
@@ -251,7 +252,7 @@ def main():
             ftp_server_username=args.username,
             ftp_server_password=args.password,
             ftp_server_port=args.port,
-            ftp_server_rename = not args.no_rename,
+            ftp_server_rename=not args.no_rename,
             max_attempts=args.max_attempts,
             backup_location=args.backup_location
     )

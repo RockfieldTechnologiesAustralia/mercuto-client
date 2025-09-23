@@ -10,7 +10,6 @@ import pytest
 from mercuto_client.ingester.backup import FileBackup, CSCPBackup
 
 
-
 def test_file_backup():
     with tempfile.TemporaryDirectory() as temp_dir:
         uri = Path(temp_dir).as_uri()
