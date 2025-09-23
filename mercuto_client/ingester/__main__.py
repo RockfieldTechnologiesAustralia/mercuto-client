@@ -6,7 +6,7 @@ import signal
 import sys
 import time
 from typing import Callable, List, TypeVar, Optional
-from urllib.parse import urlparse
+from urllib.parse import urlparse, ParseResult
 
 import schedule
 
@@ -64,7 +64,7 @@ def launch_mercuto_ingester(
             ftp_server_port: int = 2121,
             ftp_server_rename: bool = True,
             max_attempts: int = 1000,
-            backup_location: Optional[List[str]] = None
+            backup_location: Optional[List[ParseResult]] = None
            ):
 
     if backup_location is None:
