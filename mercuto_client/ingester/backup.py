@@ -203,7 +203,9 @@ class HTTPBackup(Backup):
         with open(filename, "rb") as f:
             files = {"file": (Path(filename).name, f, "text/plain")}
             response = requests.post(self.url.geturl(), files=files)
-            result = response.json().get('result', False)
+            response_data = response.json()
+            result = response_data.get('result', False)
+            logger.debug(f"HTTP Response: {response.status_code} - {response_data}")
             return result
 
 
