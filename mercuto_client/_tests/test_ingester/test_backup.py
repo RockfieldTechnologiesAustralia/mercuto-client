@@ -139,9 +139,23 @@ def http_test_client():
         yield client
 
 
-def test_http_backup(http_test_client):
-    HTTPBackup(urlparse(f'{test_url}/enqueue')).process_file(__file__)
+@pytest.fixture
+def http_test_client_simple_fail():
+    with requests_mock.Mocker() as m:
+        m.post(f"{test_url}/enqueue", json={
+            "result": False,
+            "sha512_hash": "xxxxxx",
+            "processed": False,
+        }, )
+        yield m
 
+
+def test_http_backup(http_test_client):
+    assert HTTPBackup(urlparse(f'{test_url}/enqueue')).process_file(__file__)
+
+
+def test_http_backup_fail(http_test_client_simple_fail):
+    assert not HTTPBackup(urlparse(f'{test_url}/enqueue')).process_file(__file__)
 
 # @dataclass
 # class SSHUser:
@@ -189,6 +203,7 @@ def test_http_backup(http_test_client):
 #         f"scp://{ssh_user.username}@localhost:{ssh_server.port}{ssh_user.private_key.parent}"
 #         f"?private_key={ssh_user.private_key}&script=cat {{destination}}"))
 #     assert backup.process_file(__file__)
+
 
 def test_cscp_backup_with_command(ssh_server, ssh_user):
     backup = CSCPBackup(urlparse(
