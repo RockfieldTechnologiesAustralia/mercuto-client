@@ -109,7 +109,6 @@ def http_test_client():
             return result.json()
 
         def enqueue(proxy: _RequestObjectProxy, context: _Context):
-
             boundary = proxy.text.split('\r\n')[0].strip()[2:]
             data = StringIO()
             print("MIME-Version: 1.0", file=data, end='\r\n')
