@@ -1,13 +1,22 @@
+import email
+import hashlib
 import tempfile
+from email.message import Message
+
+from io import BytesIO, StringIO
 from pathlib import Path
+from typing import BinaryIO
 from urllib.parse import urlparse
 
-# import mockssh  # type: ignore[import-untyped]
-# import paramiko
 import pytest
-# from paramiko import PasswordRequiredException
+import requests_mock
+from fastapi import APIRouter, UploadFile, FastAPI
+from fastapi.testclient import TestClient
+from pydantic import BaseModel, Field
+from requests_mock.request import _RequestObjectProxy
+from requests_mock.response import _Context
 
-from mercuto_client.ingester.backup import FileBackup, CSCPBackup
+from mercuto_client.ingester.backup import FileBackup, CSCPBackup, HTTPBackup
 
 
 def test_file_backup():
@@ -41,6 +50,97 @@ def test_file_backup_does_not_exist():
     with pytest.raises(ValueError, match="backup path does not exist"):
         uri = Path('/I/DO/NOT/EXIST').as_uri()
         FileBackup(urlparse(uri))
+
+
+class EnqueueResult(BaseModel):
+    result: bool = Field(title="The result of the enqueuing attempt")
+    sha512_hash: str = Field(title="The SHA512 sum of the received data")
+    processed: bool = Field(title="The result of processing")
+
+
+def sha512_hash_stream(stream: BinaryIO):
+    sha512_hash = hashlib.sha512()
+    chunk = stream.read(4096)
+    while len(chunk) > 0:
+        sha512_hash.update(chunk)
+        chunk = stream.read(4096)
+    return sha512_hash.hexdigest()
+
+
+def http_api_endpoint():
+    router = APIRouter()
+
+    @router.get("/ping")
+    async def ping() -> bool:
+        return True
+
+    @router.post("/enqueue")
+    async def enqueue(file: UploadFile) -> EnqueueResult:
+        filename = file.filename  # noqa: F841
+        content_type = file.content_type  # noqa: F841
+        contents = await file.read()
+        data = BytesIO(contents)
+
+        return EnqueueResult(
+            result=True,
+            sha512_hash=sha512_hash_stream(data),
+            processed=True
+        )
+    app = FastAPI(
+        title="Rockfield Mercuto Logger Duplicator",
+        version="1.0.0",
+        description="This API duplicates logger file across multiple disks",
+    )
+    app.include_router(router, prefix="", tags=["Duplicator"])
+    return app
+
+
+test_url = "http://test-server:9999"
+
+
+@pytest.fixture
+def http_test_client():
+    with requests_mock.Mocker() as m:
+        client = TestClient(http_api_endpoint())
+
+        def ping(proxy: _RequestObjectProxy, context: _Context):
+            result = client.get("/ping")
+            context.status_code = result.status_code
+            return result.json()
+
+        def enqueue(proxy: _RequestObjectProxy, context: _Context):
+
+            boundary = proxy.text.split('\r\n')[0].strip()[2:]
+            data = StringIO()
+            print("MIME-Version: 1.0", file=data, end='\r\n')
+            print(f"Content-Type: multipart/form-data; boundary={boundary}", file=data, end='\r\n')
+            print(file=data, end='\r\n')
+            print(proxy.text, file=data, end='\r\n')
+            msg = email.message_from_string(data.getvalue())
+            files = {}
+            if msg.is_multipart():
+                for part in msg.get_payload():
+                    if isinstance(part, Message):
+                        name = part.get_param('name', header='content-disposition')
+                        filename = part.get_param('filename', header='content-disposition')
+                        content_type = part.get_content_type()
+                        payload = part.get_payload()
+                        if isinstance(payload, str):
+                            files[name] = (filename, BytesIO(payload.encode('utf-8')), content_type)
+                        if isinstance(payload, bytes):
+                            files[name] = (filename, BytesIO(payload), content_type)
+            result = client.post('/enqueue', files=files)
+            context.status_code = result.status_code
+            return result.json()
+
+        m.get(f"{test_url}/ping", json=ping)
+        m.post(f"{test_url}/enqueue", json=enqueue)
+
+        yield client
+
+
+def test_http_backup(http_test_client):
+    HTTPBackup(urlparse(f'{test_url}/enqueue')).process_file(__file__)
 
 
 # @dataclass

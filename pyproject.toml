@@ -43,7 +43,11 @@ tests = [
     "isort>=6.0.1",
     "pandas>=2.3.2",
     "mock-ssh-server>=0.9.1",
-    "types-paramiko>=4.0.0.20250822"
+    "types-paramiko>=4.0.0.20250822",
+    "httpx>=0.28.1",
+    "fastapi>=0.118.0",
+    "python-multipart>=0.0.20",
+    "requests-mock>=1.12.1"
 ]
 
 [build-system]
