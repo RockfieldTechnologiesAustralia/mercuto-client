@@ -9,6 +9,7 @@ from typing import BinaryIO
 from urllib.parse import urlparse
 
 import pytest
+import requests
 import requests_mock
 from fastapi import APIRouter, UploadFile, FastAPI
 from fastapi.testclient import TestClient
@@ -145,7 +146,7 @@ def http_test_client_simple_fail():
             "result": False,
             "sha512_hash": "xxxxxx",
             "processed": False,
-        }, )
+        })
         yield m
 
 
@@ -155,6 +156,35 @@ def test_http_backup(http_test_client):
 
 def test_http_backup_fail(http_test_client_simple_fail):
     assert not HTTPBackup(urlparse(f'{test_url}/enqueue')).process_file(__file__)
+
+
+class MockResponse:
+    def __init__(self, result, status_code=200):
+        self.status_code = status_code
+        self.result = result
+        self.request_url = None
+        self.params = {}
+
+    def __call__(self, *args, **kwargs):
+        self.request_url = args[0]
+        self.params = kwargs
+        return self
+
+    def json(self):
+        return self.result
+
+
+def test_http_backup_501(monkeypatch):
+    result = {
+            "result": False,
+            "sha512_hash": "xxxxxx",
+            "processed": False,
+        }
+    monkeypatch.setattr(requests, "post", MockResponse(result, status_code=501))
+    monkeypatch.setattr(requests, "get", MockResponse(result))
+    result = HTTPBackup(urlparse(f'{test_url}/enqueue'))._process_file(__file__)
+    assert not result.result
+    assert result.status_code == 501
 
 # @dataclass
 # class SSHUser:
