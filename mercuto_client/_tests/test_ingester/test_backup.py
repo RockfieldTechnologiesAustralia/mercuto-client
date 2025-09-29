@@ -181,7 +181,6 @@ def test_http_backup_501(monkeypatch):
             "processed": False,
         }
     monkeypatch.setattr(requests, "post", MockResponse(result, status_code=501))
-    monkeypatch.setattr(requests, "get", MockResponse(result))
     result = HTTPBackup(urlparse(f'{test_url}/enqueue'))._process_file(__file__)
     assert not result.result
     assert result.status_code == 501
