@@ -217,7 +217,7 @@ class HTTPBackup(Backup):
 
     def process_file(self, filename: str) -> bool:
         result = self._process_file(filename)
-        return result.result
+        return result.result and result.status_code == 200
 
 
 def get_backup_handler(url: ParseResult) -> Callable[[str], bool]:
