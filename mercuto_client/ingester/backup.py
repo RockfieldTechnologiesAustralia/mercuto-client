@@ -5,7 +5,7 @@ import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path, PosixPath
-from typing import Callable, Optional
+from typing import Callable, Optional, Tuple, Dict
 from urllib.parse import ParseResult, parse_qs, unquote
 
 import requests
@@ -197,16 +197,27 @@ class FileBackup(Backup):
         return True
 
 
+@dataclass
+class HTTPProcessResult:
+    result: bool
+    status_code: int
+    response: Dict
+
+
 class HTTPBackup(Backup):
 
-    def process_file(self, filename: str) -> bool:
+    def _process_file(self, filename: str) -> HTTPProcessResult:
         with open(filename, "rb") as f:
             files = {"file": (Path(filename).name, f, "text/plain")}
             response = requests.post(self.url.geturl(), files=files)
             response_data = response.json()
             result = response_data.get('result', False)
             logger.debug(f"HTTP Response: {response.status_code} - {response_data}")
-            return result
+            return HTTPProcessResult(result, response.status_code, response_data)
+
+    def process_file(self, filename: str) -> bool:
+        result = self._process_file(filename)
+        return result.result
 
 
 def get_backup_handler(url: ParseResult) -> Callable[[str], bool]:
