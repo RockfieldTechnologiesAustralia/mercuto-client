@@ -8,6 +8,16 @@ from typing import Callable, Optional
 logger = logging.getLogger(__name__)
 
 
+def _default_standard_clock(_: str):
+    # Default clock function to get current time in seconds since epoch
+    return datetime.now(timezone.utc).timestamp()
+
+
+def _default_file_clock(filepath: str) -> float:
+    # Default clock function to get file creation time in seconds since epoch
+    return os.path.getctime(filepath)
+
+
 class FileProcessor:
     """
     System for processing files in a strict order with retry logic.
@@ -59,11 +69,7 @@ class FileProcessor:
         self._max_attempts = max_attempts
         self._process_callback = process_callback
         self._free_space_mb = free_space_mb
-        if clock is None:
-            # Default clock function to get current time in seconds since epoch
-            def clock(_): return datetime.now(timezone.utc).timestamp()
-        self._clock = clock
-
+        self._clock = clock if clock is not None else _default_standard_clock
         os.makedirs(self._buffer_dir, exist_ok=True)
         self._init_db()
 
@@ -102,9 +108,7 @@ class FileProcessor:
 
         """
         if clock is None:
-            # Default clock function to get current time in seconds since epoch
-            def clock(filepath: str) -> float:
-                return os.path.getctime(filepath)
+            clock = _default_file_clock
 
         conn = sqlite3.connect(self._db_path)
         cursor = conn.cursor()
@@ -241,7 +245,7 @@ class FileProcessor:
 
         def free_space_mb() -> float:
             """Returns the free space in MB on the partition where the buffer directory is located."""
-            total, used, free = shutil.disk_usage(self._buffer_dir)
+            _, _, free = shutil.disk_usage(self._buffer_dir)
             return free / (1024 * 1024)
 
         while free_space_mb() < self._free_space_mb:
@@ -261,19 +265,17 @@ class FileProcessor:
             return False
 
         filepath = oldest_file[0]
-        removed = False
         if os.path.exists(filepath):
             os.remove(filepath)
             cursor.execute(
                 "DELETE FROM file_buffer WHERE filepath = ?", (filepath,))
             conn.commit()
-            removed = True
             logger.info(f"Deleted oldest file {filepath}")
         else:
             logger.warning(f"Oldest file {filepath} does not exist.")
 
         conn.close()
-        return removed
+        return True
 
     def add_file_to_db(self, filepath: str) -> None:
         """Adds a new file to database and triggers processing."""
