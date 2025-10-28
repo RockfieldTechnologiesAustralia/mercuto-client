@@ -106,6 +106,15 @@ class EventStatisticsOut(BaseModel):
     n_events_in_range: int
     last_event: Optional[Event] = None
 
+UserContactMethod = Literal['EMAIL', 'SMS']
+
+
+class ContactGroup(BaseModel):
+    project: str
+    code: str
+    label: str
+    users: dict[str, list[UserContactMethod]]
+
 
 class Condition(BaseModel):
     code: str
@@ -329,6 +338,21 @@ class MercutoCoreService:
 
         r = self._client.request('/events/nearest', 'GET', params=params)
         return Event.model_validate_json(r.text)
+    
+    def get_event_statistics(
+        self,
+        project_code: str,
+        start_time: datetime,
+        end_time: datetime,
+    ) -> list[EventStatisticsOut]:
+        params: _PayloadType = {
+            'project_code': project_code,
+            'start_time': start_time.isoformat(),
+            'end_time': end_time.isoformat(),
+        }
+
+        r = self._client._http_request('/events/statistics', 'GET', params=params)
+        return EventStatisticsOut.model_validate_json(r.text)
 
     def get_event_statistics(
         self,
