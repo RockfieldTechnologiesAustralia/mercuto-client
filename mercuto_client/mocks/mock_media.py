@@ -74,7 +74,8 @@ class MockMercutoMediaService(MercutoMediaService, metaclass=EnforceOverridesMet
         except KeyError:
             raise MercutoHTTPException(f"Image not found: {image_code}", 404)
 
-    def upload_video(self, filename: str, project: str, start_time: datetime, end_time: datetime, camera: str | None = None, event: str | None = None) -> str:
+    def upload_video(self, filename: str, project: str, start_time: datetime, end_time: datetime,
+                     camera: str | None = None, event: str | None = None) -> str:
         code = str(uuid.uuid4())
         mime_type, _ = mimetypes.guess_type(filename, strict=False)
         if mime_type is None:

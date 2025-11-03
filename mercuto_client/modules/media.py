@@ -214,7 +214,7 @@ class MercutoMediaService:
         Then, the file is uploaded to the provided URL.
         Finally, the upload is finalized.
 
-        :returns: A request ID used to track the status of the uploaded video processing. Pass this to the /requests/{request_id} endpoint 
+        :returns: A request ID used to track the status of the uploaded video processing. Pass this to the /requests/{request_id} endpoint
         to check the status and get the video_id once processing is complete.
         """
         import mimetypes
