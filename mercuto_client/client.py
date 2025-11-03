@@ -3,7 +3,8 @@ import json as json_stdlib
 import logging
 import os
 import time
-from typing import Any, Iterator, Mapping, Optional, Protocol, Type, TypeVar
+from typing import (Any, Iterator, Literal, Mapping, Optional, Protocol, Type,
+                    TypeVar)
 
 import requests
 import requests.cookies
@@ -15,6 +16,7 @@ from .modules.core import MercutoCoreService
 from .modules.data import MercutoDataService
 from .modules.fatigue import MercutoFatigueService
 from .modules.identity import MercutoIdentityService
+from .modules.media import MercutoMediaService
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +42,7 @@ class MercutoClient:
             raise ValueError(f'Url must be https, is {url}')
 
         self._url = url
-        self._verify_ssl = verify_ssl
+        self.verify_ssl = verify_ssl
 
         if active_session is None:
             self._current_session = requests.Session()
@@ -63,11 +65,11 @@ class MercutoClient:
             raise MercutoClientException("No credentials set")
         return self._auth_method.unique_key()
 
-    def set_verify_ssl(self, verify_ssl: bool) -> None:
-        self._verify_ssl = verify_ssl
+    def setverify_ssl(self, verify_ssl: bool) -> None:
+        self.verify_ssl = verify_ssl
 
     def copy(self) -> 'MercutoClient':
-        return MercutoClient(self._url, self._verify_ssl, self._current_session)
+        return MercutoClient(self._url, self.verify_ssl, self._current_session)
 
     @contextlib.contextmanager
     def as_credentials(self, api_key: Optional[str] = None,
@@ -78,7 +80,7 @@ class MercutoClient:
         Same as .connect(), but as a context manager. Will automatically logout when exiting the context.
         """
         # TODO: We are passing the current session along to re-use connections for speed. Will this cause security issues?
-        other = MercutoClient(self._url, self._verify_ssl, self._current_session)
+        other = MercutoClient(self._url, self.verify_ssl, self._current_session)
         try:
             yield other.connect(api_key=api_key, service_token=service_token, bearer_token=bearer_token, headers=headers)
         finally:
@@ -108,6 +110,26 @@ class MercutoClient:
         base.update(headers)
         return base
 
+    def session(self) -> requests.Session:
+        return self._current_session
+
+    def request(self, url: str, method: Literal['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD', 'OPTIONS'],
+                params: Optional[dict[str, Any]] = None,
+                json: Optional[dict[str, Any]] = None,
+                raise_for_status: bool = True,
+                **kwargs: Any) -> requests.Response:
+        """
+        Make an HTTP request to the Mercuto API.
+        :param url: The URL path (relative to the base API URL) to make the request to.
+        :param method: The HTTP method to use (e.g., 'GET', 'POST', etc.).
+        :param params: Optional dictionary of query parameters to include in the request.
+        :param json: Optional dictionary to send as a JSON payload in the request body.
+        :param raise_for_status: Whether to raise an exception for HTTP error responses.
+        :param kwargs: Additional keyword arguments to pass to the requests method.
+        :return: The HTTP response object.
+        """
+        return self._http_request(url, method, params=params, json=json, raise_for_status=raise_for_status, **kwargs)
+
     def _http_request(self, url: str, method: str,
                       params: Optional[dict[str, Any]] = None,
                       json: Optional[dict[str, Any]] = None,
@@ -122,7 +144,7 @@ class MercutoClient:
         kwargs['headers'] = self._update_headers(kwargs.get('headers', {}))
 
         if 'verify' not in kwargs:
-            kwargs['verify'] = self._verify_ssl
+            kwargs['verify'] = self.verify_ssl
 
         if 'cookies' not in kwargs:
             kwargs['cookies'] = self._cookies
@@ -166,6 +188,9 @@ class MercutoClient:
 
     def core(self) -> 'MercutoCoreService':
         return self._add_and_fetch_module('core', MercutoCoreService)
+
+    def media(self) -> 'MercutoMediaService':
+        return self._add_and_fetch_module('media', MercutoMediaService)
 
     def login(self, authentication: IAuthenticationMethod) -> None:
         self._auth_method = authentication

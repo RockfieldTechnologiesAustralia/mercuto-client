@@ -1,3 +1,4 @@
+import base64
 import logging
 from types import FunctionType
 from typing import Any, Callable
@@ -67,3 +68,8 @@ class EnforceOverridesMeta(type):
                     return error_method
 
                 setattr(cls, attr, make_error_method(attr))
+
+
+def create_data_url(mime_type: str, data: bytes) -> str:
+    encoded_data = base64.b64encode(data).decode('utf-8')
+    return f"data:{mime_type};base64,{encoded_data}"
