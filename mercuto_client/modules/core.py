@@ -344,9 +344,7 @@ class MercutoCoreService:
 
     def set_event_aggregates(self, project: str, aggregates: list[EventAggregate]) -> None:
         self._client._http_request('/aggregates', 'PUT',
-                                   # type: ignore
-                                   json=[agg.model_dump(mode='json')
-                                         for agg in aggregates],
+                                   json=[agg.model_dump(mode='json') for agg in aggregates],  # type: ignore
                                    params={'project_code': project})
 
     # ALERTS
@@ -466,9 +464,7 @@ class MercutoCoreService:
         if location_description is not None:
             json['location_description'] = location_description
         if channels is not None:
-            # type: ignore[assignment]
-            json['channels'] = [channel.model_dump(
-                mode='json') for channel in channels]
+            json['channels'] = [channel.model_dump(mode='json') for channel in channels]  # type: ignore[assignment]
         r = self._client._http_request('/devices', 'PUT', json=json)
         return Device.model_validate_json(r.text)
 
