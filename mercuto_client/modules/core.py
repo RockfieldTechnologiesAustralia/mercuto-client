@@ -1,5 +1,3 @@
-import mimetypes
-import os
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Any, Literal, Optional
 
@@ -195,42 +193,10 @@ class Device(BaseModel):
 
 
 class EventAggregate(BaseModel):
-    aggregate: Literal["max", "greatest", "min", "median", "abs-max", "mean", "rms", "peak-to-peak", "daf"]
+    aggregate: Literal["max", "greatest", "min", "median",
+                       "abs-max", "mean", "rms", "peak-to-peak", "daf"]
     enabled: bool = True
     options: Optional[dict[str, Any]] = None
-
-
-class Camera(BaseModel):
-    code: str
-    project: str
-    label: str
-
-
-class Video(BaseModel):
-    code: str
-    project: str
-    camera: str | None
-    start_time: str
-    end_time: str
-    mime_type: str
-    size_bytes: int
-    name: str
-    event: str | None
-    access_url: str | None
-    access_expires: str
-
-
-class Image(BaseModel):
-    code: str
-    project: str
-    camera: str | None
-    timestamp: str | None
-    mime_type: str
-    size_bytes: int
-    name: str
-    event: str | None
-    access_url: str | None
-    access_expires: str
 
 
 class ScheduledReport(BaseModel):
@@ -267,9 +233,6 @@ _ProjectListAdapter = TypeAdapter(list[Project])
 _EventsListAdapter = TypeAdapter(list[Event])
 _DevicesListAdapter = TypeAdapter(list[Device])
 _DeviceTypeListAdapter = TypeAdapter(list[DeviceType])
-_ImageListAdapter = TypeAdapter(list[Image])
-_VideoListAdapter = TypeAdapter(list[Video])
-_CameraListAdapter = TypeAdapter(list[Camera])
 _ContactGroupListAdapter = TypeAdapter(list[ContactGroup])
 _ScheduledReportListAdapter = TypeAdapter(list[ScheduledReport])
 _ScheduledReportLogListAdapter = TypeAdapter(list[ScheduledReportLog])
@@ -316,21 +279,25 @@ class MercutoCoreService:
         return Project.model_validate_json(r.text)
 
     def ping_project(self, project: str, ip_address: str) -> None:
-        self._client._http_request(f'/projects/{project}/ping', 'POST', json={'ip_address': ip_address})
+        self._client._http_request(
+            f'/projects/{project}/ping', 'POST', json={'ip_address': ip_address})
 
     def create_dashboard(self, project_code: str, dashboards: Dashboards) -> None:
         json = dashboards.model_dump()
-        self._client._http_request(f'/projects/{project_code}/dashboard', 'POST', json=json)
+        self._client._http_request(
+            f'/projects/{project_code}/dashboard', 'POST', json=json)
 
     def set_project_event_detection(self, project: str, datatables: list[str]) -> ProjectEventDetection:
         if len(datatables) == 0:
-            raise ValueError('At least one datatable must be provided to enable event detection')
+            raise ValueError(
+                'At least one datatable must be provided to enable event detection')
 
         params: _PayloadType = {
             "enabled": True,
             "datatables": datatables
         }
-        r = self._client._http_request(f'/projects/{project}/event-detection', 'POST', json=params)
+        r = self._client._http_request(
+            f'/projects/{project}/event-detection', 'POST', json=params)
         return ProjectEventDetection.model_validate_json(r.text)
 
     # EVENTS
@@ -377,7 +344,9 @@ class MercutoCoreService:
 
     def set_event_aggregates(self, project: str, aggregates: list[EventAggregate]) -> None:
         self._client._http_request('/aggregates', 'PUT',
-                                   json=[agg.model_dump(mode='json') for agg in aggregates],  # type: ignore
+                                   # type: ignore
+                                   json=[agg.model_dump(mode='json')
+                                         for agg in aggregates],
                                    params={'project_code': project})
 
     # ALERTS
@@ -412,7 +381,8 @@ class MercutoCoreService:
         }
         if contact_group is not None:
             json['contact_group'] = contact_group
-        r = self._client._http_request('/alerts/configurations', 'PUT', json=json)
+        r = self._client._http_request(
+            '/alerts/configurations', 'PUT', json=json)
         return AlertConfiguration.model_validate_json(r.text)
 
     def get_alert_configuration(self, code: str) -> AlertConfiguration:
@@ -443,9 +413,11 @@ class MercutoCoreService:
         if channels is not None:
             params['channels'] = channels
         if start_time is not None:
-            params['start_time'] = start_time.isoformat() if isinstance(start_time, datetime) else start_time
+            params['start_time'] = start_time.isoformat() if isinstance(
+                start_time, datetime) else start_time
         if end_time is not None:
-            params['end_time'] = end_time.isoformat() if isinstance(end_time, datetime) else end_time
+            params['end_time'] = end_time.isoformat() if isinstance(
+                end_time, datetime) else end_time
 
         r = self._client._http_request('/alerts/logs', 'GET', params=params)
         return AlertSummary.model_validate_json(r.text)
@@ -494,114 +466,11 @@ class MercutoCoreService:
         if location_description is not None:
             json['location_description'] = location_description
         if channels is not None:
-            json['channels'] = [channel.model_dump(mode='json') for channel in channels]  # type: ignore[assignment]
+            # type: ignore[assignment]
+            json['channels'] = [channel.model_dump(
+                mode='json') for channel in channels]
         r = self._client._http_request('/devices', 'PUT', json=json)
         return Device.model_validate_json(r.text)
-
-    # MEDIA
-
-    def list_cameras(self, project: str) -> list[Camera]:
-        params: _PayloadType = {}
-        params['project_code'] = project
-        r = self._client._http_request('/media/cameras', 'GET', params=params)
-        return _CameraListAdapter.validate_json(r.text)
-
-    def list_videos(self, project: Optional[str] = None, event: Optional[str] = None, camera: Optional[str] = None) -> list[Video]:
-        params: _PayloadType = {}
-        if project is not None:
-            params['project'] = project
-        if event is not None:
-            params['event'] = event
-        if camera is not None:
-            params['camera'] = camera
-        r = self._client._http_request('/media/videos', 'GET', params=params)
-        return _VideoListAdapter.validate_json(r.text)
-
-    def get_video(self, code: str) -> Video:
-        r = self._client._http_request(f'/media/videos/{code}', 'GET')
-        return Video.model_validate_json(r.text)
-
-    def list_images(self, project: Optional[str] = None, event: Optional[str] = None, camera: Optional[str] = None) -> list[Image]:
-        params = {}
-        if project is not None:
-            params['project'] = project
-        if event is not None:
-            params['event'] = event
-        if camera is not None:
-            params['camera'] = camera
-        r = self._client._http_request('/media/images', 'GET', params=params)
-        return _ImageListAdapter.validate_json(r.text)
-
-    def get_image(self, code: str) -> Image:
-        r = self._client._http_request(f'/media/images/{code}', 'GET')
-        return Image.model_validate_json(r.text)
-
-    def upload_image(self, project: str, file: str, event: Optional[str] = None,
-                     camera: Optional[str] = None, timestamp: Optional[datetime] = None,
-                     filename: Optional[str] = None) -> Image:
-        if timestamp is not None and timestamp.tzinfo is None:
-            raise ValueError("Timestamp must be timezone aware")
-
-        mimetype, _ = mimetypes.guess_type(file, strict=False)
-        if mimetype is None or not mimetype.startswith('image/'):
-            raise ValueError(f"File {file} is not an image")
-
-        if os.stat(file).st_size > 5_000_000:
-            raise ValueError(f"File {file} is too large")
-
-        if filename is None:
-            filename = os.path.basename(file)
-
-        params: _PayloadType = {}
-        params['project'] = project
-        if event is not None:
-            params['event'] = event
-        if camera is not None:
-            params['camera'] = camera
-        if timestamp is not None:
-            params['timestamp'] = timestamp.isoformat()
-
-        with open(file, 'rb') as f:
-            r = self._client._http_request('/media/images', 'PUT',
-                                           params=params,
-                                           files={
-                                               'file': (filename, f, mimetype)
-                                           })
-        return Image.model_validate_json(r.text)
-
-    def upload_video(self, project: str, file: str,
-                     start_time: datetime, end_time: datetime,
-                     event: Optional[str] = None,
-                     filename: Optional[str] = None) -> Video:
-        if start_time.tzinfo is None:
-            raise ValueError("Timestamp must be timezone aware")
-        if end_time.tzinfo is None:
-            raise ValueError("Timestamp must be timezone aware")
-
-        mimetype, _ = mimetypes.guess_type(file, strict=False)
-        if mimetype is None or not mimetype.startswith('video/'):
-            raise ValueError(f"File {file} is not a video")
-
-        if os.stat(file).st_size > 5_000_000:
-            raise ValueError(f"File {file} is too large")
-
-        if filename is None:
-            filename = os.path.basename(file)
-
-        params: _PayloadType = {}
-        params['project'] = project
-        params['start_time'] = start_time.isoformat()
-        params['end_time'] = end_time.isoformat()
-        if event is not None:
-            params['event'] = event
-
-        with open(file, 'rb') as f:
-            r = self._client._http_request('/media/videos', 'PUT',
-                                           params=params,
-                                           files={
-                                               'file': (filename, f, mimetype)
-                                           })
-        return Video.model_validate_json(r.text)
 
     # Contacts
 
@@ -609,11 +478,13 @@ class MercutoCoreService:
         params: _PayloadType = {}
         if project is not None:
             params['project'] = project
-        r = self._client._http_request('/notifications/contact_groups', 'GET', params=params)
+        r = self._client._http_request(
+            '/notifications/contact_groups', 'GET', params=params)
         return _ContactGroupListAdapter.validate_json(r.text)
 
     def get_contact_group(self, code: str) -> ContactGroup:
-        r = self._client._http_request(f'/notifications/contact_groups/{code}', 'GET')
+        r = self._client._http_request(
+            f'/notifications/contact_groups/{code}', 'GET')
         return ContactGroup.model_validate_json(r.text)
 
     def create_contact_group(self, project: str, label: str, users: dict[str, list[UserContactMethod]]) -> ContactGroup:
@@ -630,7 +501,8 @@ class MercutoCoreService:
         params: _PayloadType = {}
         if project is not None:
             params['project'] = project
-        r = self._client._http_request('/reports/scheduled', 'GET', params=params)
+        r = self._client._http_request(
+            '/reports/scheduled', 'GET', params=params)
         return _ScheduledReportListAdapter.validate_json(r.text)
 
     def create_report(self, project: str, label: str, schedule: str, revision: str,
@@ -657,11 +529,13 @@ class MercutoCoreService:
         params: _PayloadType = {}
         if project is not None:
             params['project'] = project
-        r = self._client._http_request(f'/reports/scheduled/{report}/logs', 'GET', params=params)
+        r = self._client._http_request(
+            f'/reports/scheduled/{report}/logs', 'GET', params=params)
         return _ScheduledReportLogListAdapter.validate_json(r.text)
 
     def get_report_log(self, report: str, log: str) -> ScheduledReportLog:
-        r = self._client._http_request(f'/reports/scheduled/{report}/logs/{log}', 'GET')
+        r = self._client._http_request(
+            f'/reports/scheduled/{report}/logs/{log}', 'GET')
         return ScheduledReportLog.model_validate_json(r.text)
 
     def create_report_revision(self, project: str, revision_date: datetime, description: str, source_code_data_url: str) -> ReportSourceCodeRevision:
@@ -670,5 +544,6 @@ class MercutoCoreService:
             'description': description,
             'source_code_data_url': source_code_data_url,
         }
-        r = self._client._http_request('/reports/revisions', 'PUT', json=json, params={'project': project})
+        r = self._client._http_request(
+            '/reports/revisions', 'PUT', json=json, params={'project': project})
         return ReportSourceCodeRevision.model_validate_json(r.text)
