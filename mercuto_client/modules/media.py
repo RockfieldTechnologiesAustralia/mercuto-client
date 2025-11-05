@@ -64,10 +64,12 @@ class CameraTrigger(BaseModel):
 
 
 class Camera(BaseModel):
+    code: str
     project: str
     label: str
     triggers: list[CameraTrigger]
-    camera_type: Literal['BOSCH', 'DIRECT_RTSP', 'STATIC', 'ROCKFIELD-CAMERA-SERVER-VERSION-2']
+    camera_type: Literal['BOSCH', 'DIRECT_RTSP',
+                         'STATIC', 'ROCKFIELD-CAMERA-SERVER-VERSION-2']
     encode_timestamp: bool = True
     encode_blur: bool = False
     blur_steps: Optional[int] = None
@@ -160,11 +162,13 @@ class MercutoMediaService:
 
         if filedata is not None:
             from io import BytesIO
-            r = self._client.request(f"{self._path}/images", "PUT", params=params, files={'file': (filename, BytesIO(filedata))})
+            r = self._client.request(
+                f"{self._path}/images", "PUT", params=params, files={'file': (filename, BytesIO(filedata))})
             return Image.model_validate_json(r.text)
         else:
             with open(filename, 'rb') as f:
-                r = self._client.request(f"{self._path}/images", "PUT", params=params, files={'file': f})
+                r = self._client.request(
+                    f"{self._path}/images", "PUT", params=params, files={'file': f})
         return Image.model_validate_json(r.text)
 
     # --- Videos ---
@@ -220,7 +224,8 @@ class MercutoMediaService:
         import mimetypes
         mime_type = mimetypes.guess_type(filename, strict=False)[0]
         if mime_type is None:
-            raise ValueError(f"Could not determine MIME type for file: {filename}")
+            raise ValueError(
+                f"Could not determine MIME type for file: {filename}")
         if mime_type not in {'video/mp4', 'video/avi', 'video/mov', 'video/mkv'}:
             raise ValueError(f"Unsupported video MIME type: {mime_type}")
 
@@ -237,14 +242,16 @@ class MercutoMediaService:
             init_payload['event'] = event
         init_request = self._client.request(f"{self._path}/videos", "POST", json=init_payload,
                                             params={'project': project, 'action': 'initialize'})
-        init_request_response = _VideoUploadInitializeResponse.model_validate_json(init_request.text)
+        init_request_response = _VideoUploadInitializeResponse.model_validate_json(
+            init_request.text)
 
         # 2. Upload the video file
         with open(filename, 'rb') as f:
-            files = {'file': f}
-            resp = self._client.session().put(init_request_response.presigned_put_url, files=files, verify=self._client.verify_ssl)
+            resp = self._client.session().put(init_request_response.presigned_put_url,
+                                              data=f, verify=self._client.verify_ssl)
             if not resp.ok:
-                raise MercutoHTTPException(f"Video upload failed: {resp.text}", resp.status_code)
+                raise MercutoHTTPException(
+                    f"Video upload failed: {resp.text}", resp.status_code)
 
         # 3. Finalize the upload
         self._client.request(f"{self._path}/videos", "POST", params={
@@ -274,7 +281,8 @@ class MercutoMediaService:
                       camera_username: Optional[str] = None,
                       camera_password: Optional[str] = None,
                       camera_serial: Optional[str] = None,
-                      camera_type: Literal['BOSCH', 'DIRECT_RTSP', 'STATIC', 'ROCKFIELD-CAMERA-SERVER-VERSION-2'] = 'DIRECT_RTSP',
+                      camera_type: Literal['BOSCH', 'DIRECT_RTSP', 'STATIC',
+                                           'ROCKFIELD-CAMERA-SERVER-VERSION-2'] = 'DIRECT_RTSP',
                       rtsp_url: Optional[str] = None,) -> Camera:
         payload: PayloadType = {
             'label': label,
@@ -311,5 +319,6 @@ class MercutoMediaService:
         if triggers:
             payload['triggers'] = [trigger.model_dump(mode='json') for trigger in triggers]  # type: ignore
 
-        r = self._client.request(f"{self._path}/cameras", "PUT", json=payload, params={'project': project})
+        r = self._client.request(
+            f"{self._path}/cameras", "PUT", json=payload, params={'project': project})
         return Camera.model_validate_json(r.text)
