@@ -200,6 +200,8 @@ class FileBackup(Backup):
 @dataclass
 class HTTPProcessResult:
     result: bool
+    sha512_hash: str
+    processed: bool
     status_code: int
     response: Dict
 
@@ -212,8 +214,11 @@ class HTTPBackup(Backup):
             response = requests.post(self.url.geturl(), files=files)
             response_data = response.json()
             result = response_data.get('result', False)
+            sha512_hash = response_data.get('sha512_hash', None)
+            processed = response_data.get('processed', False)
+
             logger.debug(f"HTTP Response: {response.status_code} - {response_data}")
-            return HTTPProcessResult(result, response.status_code, response_data)
+            return HTTPProcessResult(result, sha512_hash, processed, response.status_code, response_data)
 
     def process_file(self, filename: str) -> bool:
         result = self._process_file(filename)
