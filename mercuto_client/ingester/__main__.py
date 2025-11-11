@@ -10,13 +10,12 @@ from urllib.parse import urlparse, ParseResult
 
 import schedule
 
-from mercuto_client.ingester.backup import get_backup_handler
-from mercuto_client.ingester.pid_file import PidFile
-
+from .ingester.backup import get_backup_handler
+from .ingester.pid_file import PidFile
+from ..util import get_free_space_excluding_files
 from .ftp import simple_ftp_server
 from .mercuto import MercutoIngester
 from .processor import FileProcessor
-from .util import get_free_space_excluding_files
 
 logger = logging.getLogger(__name__)
 
@@ -58,6 +57,7 @@ def launch_mercuto_ingester(
             logfile: Optional[str] = None,
             directory: Optional[str] = None,
             size: Optional[int] = None,
+            max_files: Optional[int] = None,
             mapping: Optional[str] = None,
             clean: bool = False,
             ftp_server_username: str = 'logger',
@@ -72,7 +72,6 @@ def launch_mercuto_ingester(
         backup_location = []
 
     with PidFile(pid_file):
-
         if workdir is None:
             workdir = os.path.join(os.path.expanduser('~'), ".mercuto-ingester")
         elif workdir.startswith("~"):
@@ -113,8 +112,7 @@ def launch_mercuto_ingester(
         ftp_dir = os.path.join(workdir, 'temp-ftp-data')
         os.makedirs(ftp_dir, exist_ok=True)
 
-        size = size
-        if size is None:
+        if size is None and max_files is None:
             size = get_free_space_excluding_files(buffer_directory) * 0.75 // (1024 * 1024)  # Convert to MB
             logging.info(f"Buffer size set to {size} MB based on available disk space.")
 
@@ -154,7 +152,8 @@ def launch_mercuto_ingester(
             db_path=database_path,
             process_callback=lambda filename: all(handler(filename) for handler in all_handlers),
             max_attempts=max_attempts,
-            free_space_mb=size)
+            free_space_mb=size,
+            max_files=max_files)
 
         processor.scan_existing_files()
 
@@ -196,6 +195,8 @@ def main():
     parser.add_argument('-s', '--size', type=int,
                         help='Size in MB for total amount of files to store in the buffer. \
                             Default is 75% of the available disk space on the buffer partition excluding the directory itself', default=None)
+    parser.add_argument('--max-files', type=int,
+                        help='Maximum number of files to keep in the buffer. Default is to use the size param.', default=None)
     parser.add_argument('--max-attempts', type=int,
                         help='Maximum number of attempts to process a file before giving up. Default is 1000.',
                         default=1000)
@@ -247,6 +248,7 @@ def main():
             logfile=args.logfile,
             directory=args.directory,
             size=args.size,
+            max_files=args.max_files,
             mapping=args.mapping,
             clean=args.clean,
             ftp_server_username=args.username,

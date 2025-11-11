@@ -1,13 +1,14 @@
 import fnmatch
-import itertools
 import logging
 import os
 from typing import Optional
 
 from .. import MercutoClient, MercutoHTTPException
-from ..types import Channel, DataSample, DatatableOut, Project
+from ..modules.core import Project
+from ..modules.data import (Channel, ChannelClassification, Datatable,
+                            SecondaryDataSample)
+from ..util import batched, get_my_public_ip
 from .parsers import detect_parser
-from .util import batched, get_my_public_ip
 
 logger = logging.getLogger(__name__)
 
@@ -22,19 +23,19 @@ class MercutoIngester:
 
         self._project: Optional[Project] = None
         self._secondary_channels: Optional[list[Channel]] = None
-        self._datatables: Optional[list[DatatableOut]] = None
+        self._datatables: Optional[list[Datatable]] = None
 
         self._channel_map: dict[str, str] = {}
 
     def _refresh_mercuto_data(self) -> None:
         with self._client.as_credentials(api_key=self._api_key) as client:
-            self._project = client.projects().get_project(self._project_code)
-            assert self._project['code'] == self._project_code
+            self._project = client.core().get_project(self._project_code)
+            assert self._project.code == self._project_code
 
-            self._secondary_channels = client.channels().get_channels(self._project_code, classification='SECONDARY')
-            self._datatables = list(itertools.chain.from_iterable([dt['datatables'] for dt in client.devices().list_dataloggers(self._project_code)]))
+            self._secondary_channels = client.data().list_channels(self._project_code, classification=ChannelClassification.SECONDARY)
+            self._datatables = client.data().list_datatables(self._project_code)
 
-        self._channel_map.update({c['label']: c['code'] for c in self._secondary_channels})
+        self._channel_map.update({c.label: c.code for c in self._secondary_channels})
 
     def _can_process(self) -> bool:
         return self._project is not None and self._secondary_channels is not None and self._datatables is not None
@@ -56,7 +57,7 @@ class MercutoIngester:
         """
         ip = get_my_public_ip()
         with self._client.as_credentials(api_key=self._api_key) as client:
-            client.projects().ping_project(self.project_code, ip_address=ip)
+            client.core().ping_project(self.project_code, ip_address=ip)
             logging.info(f"Pinged Mercuto server from IP: {ip} for project: {self.project_code}")
 
     def matching_datatable(self, filename: str) -> str | None:
@@ -85,20 +86,18 @@ class MercutoIngester:
 
         for dt in self._datatables:
             # Match using datatable pattern
-            if matches(dt['name']):
-                return dt['code']
-            if dt['src'] and matches(dt['src']):
-                return dt['code']
+            if matches(dt.name):
+                return dt.code
         return None
 
-    def _upload_samples(self, samples: list[DataSample]) -> bool:
+    def _upload_samples(self, samples: list[SecondaryDataSample]) -> bool:
         """
         Upload samples to the Mercuto project.
         """
         try:
             with self._client.as_credentials(api_key=self._api_key) as client:
                 for batch in batched(samples, 500):
-                    client.data().upload_samples(batch)
+                    client.data().insert_secondary_samples(self.project_code, batch)
             return True
         except MercutoHTTPException as e:
             if e.status_code in NON_RETRYABLE_ERRORS:

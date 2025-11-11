@@ -9,8 +9,8 @@ dependencies = [
     "python-dateutil>=2.9.0.post0",
     "pytz>=2025.2",
     "schedule>=1.2.2",
-    'pydantic>=2.0',
-    'zc.lockfile>=4.0'
+    'zc.lockfile>=4.0',
+    'pydantic>=2.0'
 ]
 version = "0.0.0"  # This will be replaced by the workflow
 keywords = ["mercuto", "rockfield", "infratech"]

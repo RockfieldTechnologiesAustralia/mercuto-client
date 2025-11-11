@@ -37,7 +37,7 @@ def temp_env() -> Generator[Tuple[FileProcessor, str, str], None, None]:
 
 def test_init_db(temp_env: Tuple[FileProcessor, str, str]) -> None:
     """Verify database initialization"""
-    processor, _, db_path = temp_env
+    _, _, db_path = temp_env
     conn: sqlite3.Connection = sqlite3.connect(db_path)
     cursor: sqlite3.Cursor = conn.cursor()
     cursor.execute(

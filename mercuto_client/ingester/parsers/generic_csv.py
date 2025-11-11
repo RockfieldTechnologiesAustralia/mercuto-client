@@ -5,7 +5,7 @@ from typing import Optional
 import pytz
 from dateutil import parser
 
-from ...types import DataSample
+from ...modules.data import SecondaryDataSample
 
 logger = logging.getLogger(__name__)
 
@@ -56,7 +56,7 @@ def _parse_csv_line(line: str, sep: str = ',', timestamp_index: int = 0) -> tupl
 
 def parse_generic_csv_file(filename: str, label_to_channel_code: dict[str, str],
                            header_index: int, data_index: int,
-                           timezone: Optional[pytz.BaseTzInfo] = None) -> list[DataSample]:
+                           timezone: Optional[pytz.BaseTzInfo] = None) -> list[SecondaryDataSample]:
     """
     header index: Number of lines to skip before header
     data index: Number of lines to skip after the header before data
@@ -64,7 +64,7 @@ def parse_generic_csv_file(filename: str, label_to_channel_code: dict[str, str],
     We are avoiding using pandas here to keep dependencies minimal as this is often run on edge devices.
     """
 
-    output: list[DataSample] = []
+    output: list[SecondaryDataSample] = []
     with open(filename, "r") as f:
         for _ in range(header_index):
             next(f, None)
@@ -109,6 +109,6 @@ def parse_generic_csv_file(filename: str, label_to_channel_code: dict[str, str],
 
                 logger.debug(
                     f"Adding entry for label: {header} with value: {value} and timestamp: {timestamp}")
-                output.append(DataSample(timestamp=timestamp.isoformat(),
-                              channel_code=channel_code, value=value))
+                output.append(SecondaryDataSample(timestamp=timestamp,
+                              channel=channel_code, value=value))
     return output

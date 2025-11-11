@@ -1,7 +1,5 @@
 import json
-from typing import TypeVar
-
-from .types import AccessControlListJson, AccessControlListJsonEntry
+from typing import TypedDict, TypeVar
 
 
 class ResourceTypes:
@@ -65,36 +63,44 @@ class ServiceTypes:
     WILDCARD = '*'
 
 
-T = TypeVar('T', bound='AclPolicyBuilder')
+_T = TypeVar('_T', bound='AclPolicyBuilder')
 
 
 class AclPolicyBuilder:
-    def __init__(self) -> None:
-        self._permissions: list[AccessControlListJsonEntry] = []
+    class _AclEntryType(TypedDict):
+        action: str
+        resource: str
 
-    def allow(self: T, action: str, resource: str) -> T:
+    class _AclPolicyType(TypedDict):
+        version: int
+        permissions: list['AclPolicyBuilder._AclEntryType']
+
+    def __init__(self) -> None:
+        self._permissions: list[AclPolicyBuilder._AclEntryType] = []
+
+    def allow(self: _T, action: str, resource: str) -> _T:
         self._permissions.append({
             'action': action,
             'resource': resource
         })
         return self
 
-    def allow_all(self: T, action: str) -> T:
+    def allow_all(self: _T, action: str) -> _T:
         self.allow(action, f"mrn:{ServiceTypes.WILDCARD}:{ResourceTypes.WILDCARD}/{ResourceTypes.WILDCARD}")
         return self
 
-    def allow_project(self: T, action: str, project_code: str) -> T:
+    def allow_project(self: _T, action: str, project_code: str) -> _T:
         self.allow(action, f"mrn:{ServiceTypes.MERCUTO}:{ResourceTypes.Mercuto.PROJECT}/{project_code}")
         return self
 
-    def allow_tenant(self: T, action: str, tenant_code: str) -> T:
+    def allow_tenant(self: _T, action: str, tenant_code: str) -> _T:
         self.allow(action, f"mrn:{ServiceTypes.IDENTITY}:{ResourceTypes.Identity.TENANT}/{tenant_code}")
         return self
 
     def as_string(self) -> str:
         return json.dumps(self.as_dict())
 
-    def as_dict(self) -> AccessControlListJson:
+    def as_dict(self) -> _AclPolicyType:
         return {
             'version': 1,
             'permissions': self._permissions

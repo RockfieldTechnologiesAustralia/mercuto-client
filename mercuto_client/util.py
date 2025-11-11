@@ -1,9 +1,22 @@
 import itertools
 import shutil
+from datetime import timedelta
 from pathlib import Path
 from typing import Iterable, Iterator, TypeVar
 
 import requests
+
+
+def timedelta_isoformat(td: timedelta) -> str:
+    """
+    ISO 8601 encoding for Python timedelta object.
+    Taken from pydantic source:
+        https://github.com/pydantic/pydantic/blob/3704eccce4661455acdda1cdcf716bd4b3382e08/pydantic/deprecated/json.py#L135-L140
+
+    """
+    minutes, seconds = divmod(td.seconds, 60)
+    hours, minutes = divmod(minutes, 60)
+    return f'{"-" if td.days < 0 else ""}P{abs(td.days)}DT{hours:d}H{minutes:d}M{seconds:d}.{td.microseconds:06d}S'
 
 
 def get_my_public_ip() -> str:
@@ -51,14 +64,17 @@ def get_free_space_excluding_files(directory: str) -> int:
 
 T = TypeVar('T')
 
-
-def batched(iterable: Iterable[T], n: int) -> Iterator[tuple[T, ...]]:
-    """
-    Implementation of itertools.batched for < Python 3.12
-    """
-    it = iter(iterable)
-    while True:
-        chunk = tuple(itertools.islice(it, n))
-        if not chunk:
-            break
-        yield chunk
+try:
+    from itertools import batched  # type: ignore
+except ImportError:
+    # Python < 3.12
+    def batched(iterable: Iterable[T], n: int) -> Iterator[tuple[T, ...]]:  # type: ignore[no-redef]
+        """
+        Implementation of itertools.batched for < Python 3.12
+        """
+        it = iter(iterable)
+        while True:
+            chunk = tuple(itertools.islice(it, n))
+            if not chunk:
+                break
+            yield chunk
