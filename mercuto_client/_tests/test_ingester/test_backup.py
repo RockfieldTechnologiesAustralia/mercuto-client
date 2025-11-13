@@ -2,7 +2,6 @@ import email
 import hashlib
 import tempfile
 from email.message import Message
-
 from io import BytesIO, StringIO
 from pathlib import Path
 from typing import BinaryIO
@@ -11,13 +10,13 @@ from urllib.parse import urlparse
 import pytest
 import requests
 import requests_mock
-from fastapi import APIRouter, UploadFile, FastAPI
+from fastapi import APIRouter, FastAPI, UploadFile
 from fastapi.testclient import TestClient
 from pydantic import BaseModel, Field
 from requests_mock.request import _RequestObjectProxy
 from requests_mock.response import _Context
 
-from mercuto_client.ingester.backup import FileBackup, CSCPBackup, HTTPBackup
+from mercuto_client.ingester.backup import CSCPBackup, FileBackup, HTTPBackup
 
 
 def test_file_backup():
@@ -176,10 +175,10 @@ class MockResponse:
 
 def test_http_backup_501(monkeypatch):
     result = {
-            "result": False,
-            "sha512_hash": "xxxxxx",
-            "processed": False,
-        }
+        "result": False,
+        "sha512_hash": "xxxxxx",
+        "processed": False,
+    }
     monkeypatch.setattr(requests, "post", MockResponse(result, status_code=501))
     result = HTTPBackup(urlparse(f'{test_url}/enqueue'))._process_file(__file__)
     assert not result.result
