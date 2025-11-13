@@ -356,7 +356,7 @@ class MercutoCoreService:
         project_code: str,
         start_time: datetime,
         end_time: datetime,
-    ) -> list[EventStatisticsOut]:
+    ) -> EventStatisticsOut:
         params: _PayloadType = {
             'project_code': project_code,
             'start_time': start_time.isoformat(),
