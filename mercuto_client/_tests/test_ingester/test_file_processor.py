@@ -230,7 +230,6 @@ def test_ensure_free_space(database_path: str, buffer_directory: str) -> None:
         Returns remaining_free_space_mb - number of files in the buffer directory.
         """
         n_files = len(os.listdir(buffer_directory))
-        nonlocal remaining_free_space_mb
         return remaining_free_space_mb - n_files
 
     processor = FileProcessor(
@@ -244,7 +243,6 @@ def test_ensure_free_space(database_path: str, buffer_directory: str) -> None:
     )
 
     def create_and_add_file(name: str) -> str:
-        nonlocal buffer_directory, processor
         file_path = os.path.join(buffer_directory, name)
         with open(file_path, 'w') as f:
             f.write("Test content")
@@ -288,7 +286,6 @@ def test_ensure_free_space_with_externally_modified_files(database_path: str, bu
         Returns remaining_free_space_mb - number of files in the buffer directory.
         """
         n_files = len(os.listdir(buffer_directory))
-        nonlocal remaining_free_space_mb
         return remaining_free_space_mb - n_files
 
     processor = FileProcessor(
@@ -302,7 +299,6 @@ def test_ensure_free_space_with_externally_modified_files(database_path: str, bu
     )
 
     def create_and_add_file(name: str) -> str:
-        nonlocal buffer_directory, processor
         file_path = os.path.join(buffer_directory, name)
         with open(file_path, 'w') as f:
             f.write("Test content")
@@ -345,7 +341,6 @@ def test_cleanup_max_files_with_externally_modified_files(database_path: str, bu
     )
 
     def create_and_add_file(name: str) -> str:
-        nonlocal buffer_directory, processor
         file_path = os.path.join(buffer_directory, name)
         with open(file_path, 'w') as f:
             f.write("Test content")
