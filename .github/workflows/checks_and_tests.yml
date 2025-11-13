@@ -10,21 +10,16 @@ permissions:
   packages: read # Read packages from GitHub Package Registry
   contents: read  # This is required for actions/checkout
 jobs:
-  python-checks:
+  lint-and-type-checking:
     timeout-minutes: 5
     runs-on: ubuntu-latest
-    container:
-      image: ubuntu:latest
-    strategy:
-      matrix:
-        python-version: ["3.10", "3.11", "3.12"]
     steps:
       - name: Get repo
         uses: actions/checkout@v4
       - name: Install uv
         uses: astral-sh/setup-uv@v6
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: "3.12"
       - name: Install dependencies
         run: |
           uv sync --all-groups
@@ -37,6 +32,30 @@ jobs:
       - name: Validate MyPy
         run: |
           uv run mypy ./mercuto_client/ --ignore-missing-imports --explicit-package-bases --exclude build/* 
+  unit-tests-all-architectures:
+    timeout-minutes: 5
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
+    steps:
+      - name: Get repo
+        uses: actions/checkout@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install dependencies
+        run: |
+          uv sync --all-groups
       - name: Run unit tests
         run: |
           uv run pytest ./mercuto_client/
+  all-checks:
+      # This is a dummy job to aggregate all checks to make it easier to enforce GH status checks rules
+      runs-on: ubuntu-latest
+      needs: [lint-and-type-checking, unit-tests-all-architectures]
+      steps:
+        - run: echo "All checks passed"
