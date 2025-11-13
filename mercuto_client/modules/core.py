@@ -98,6 +98,15 @@ class Event(BaseModel):
     tags: list[EventTag]
 
 
+class EventStatisticsOut(BaseModel):
+    n_events_last_week: int
+    n_events_last_month: int
+    n_events_last_year: int
+    n_events_all_time: int
+    n_events_in_range: int
+    last_event: Optional[Event] = None
+
+
 UserContactMethod = Literal['EMAIL', 'SMS']
 
 
@@ -341,6 +350,21 @@ class MercutoCoreService:
 
         r = self._client._http_request('/events/nearest', 'GET', params=params)
         return Event.model_validate_json(r.text)
+
+    def get_event_statistics(
+        self,
+        project_code: str,
+        start_time: datetime,
+        end_time: datetime,
+    ) -> EventStatisticsOut:
+        params: _PayloadType = {
+            'project_code': project_code,
+            'start_time': start_time.isoformat(),
+            'end_time': end_time.isoformat(),
+        }
+
+        r = self._client._http_request('/events/statistics', 'GET', params=params)
+        return EventStatisticsOut.model_validate_json(r.text)
 
     def set_event_aggregates(self, project: str, aggregates: list[EventAggregate]) -> None:
         self._client._http_request('/aggregates', 'PUT',
