@@ -237,11 +237,13 @@ class FileProcessor:
                 "DELETE FROM file_buffer WHERE filepath = ?", (filepath,))
             conn.commit()
             conn.close()
-            if os.path.exists(filepath):
+            try:
                 os.remove(filepath)
                 logger.info(f"Deleted old file {filepath}")
-            else:
+            except FileNotFoundError:
                 logger.warning(f"File {filepath} does not exist for deletion.")
+            except Exception as e:
+                logger.error(f"Error deleting file {filepath}: {e}")
 
     def cleanup_old_files(self) -> None:
         """Remove old files based on max_files and free space."""
@@ -283,11 +285,13 @@ class FileProcessor:
             "DELETE FROM file_buffer WHERE filepath = ?", (filepath,))
         conn.commit()
         conn.close()
-        if os.path.exists(filepath):
+        try:
             os.remove(filepath)
             logger.info(f"Deleted oldest file {filepath}")
-        else:
+        except FileNotFoundError:
             logger.warning(f"Oldest file {filepath} does not exist.")
+        except Exception as e:
+            logger.error(f"Error deleting oldest file {filepath}: {e}")
 
         return True
 
