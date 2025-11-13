@@ -40,7 +40,7 @@ if __name__ == '__main__':
                         help='Enable verbose output')
     parser.add_argument('-d', '--directory', type=str,
                         help='Directory to store ingested files. Default is a directory called `buffered-files` in the workdir.')
-    parser.add_argument('-s', '--target_free_space_mb', type=int,
+    parser.add_argument('-s', '--target-free-space-mb', type=int,
                         help='Size in MB for total amount of remaining free space to keep available. \
                             Default is 25% of the available disk space on the buffer partition excluding the directory itself', default=None)
     parser.add_argument('--max-files', type=int,
