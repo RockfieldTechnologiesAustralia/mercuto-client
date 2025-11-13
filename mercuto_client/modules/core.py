@@ -106,6 +106,7 @@ class EventStatisticsOut(BaseModel):
     n_events_in_range: int
     last_event: Optional[Event] = None
 
+
 UserContactMethod = Literal['EMAIL', 'SMS']
 
 
@@ -349,7 +350,7 @@ class MercutoCoreService:
 
         r = self._client._http_request('/events/nearest', 'GET', params=params)
         return Event.model_validate_json(r.text)
-    
+
     def get_event_statistics(
         self,
         project_code: str,
