@@ -231,9 +231,9 @@ class FileBackup(IBackupHandler):
                 self.backup_path.mkdir(parents=True, exist_ok=True)
                 logger.info(f"Created backup path: {self.backup_path}")
             else:
-                raise ValueError(f"{self} backup path does not exist")
+                raise ValueError(f"{self.backup_path} backup path does not exist")
         if not self.backup_path.is_dir():
-            raise ValueError(f"{self} backup path must be a directory")
+            raise ValueError(f"{self.backup_path} backup path must be a directory")
 
     def process_file(self, filename: str) -> bool:
         if self.backup_path is None:
