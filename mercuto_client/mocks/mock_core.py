@@ -1,6 +1,7 @@
 import logging
 import uuid
 from datetime import datetime
+from typing import Optional
 
 from ..client import MercutoClient
 from ..exceptions import MercutoHTTPException
@@ -25,5 +26,19 @@ class MockMercutoCoreService(MercutoCoreService, metaclass=EnforceOverridesMeta)
             raise MercutoHTTPException(status_code=404, message=f"Event {event} not found")
         return self._events[event]
 
-    def list_events(self, project: str) -> list[Event]:
-        return [event for event in self._events.values() if event.project.code == project]
+    def list_events(self, project: str,
+                    start_time: Optional[datetime] = None,
+                    end_time: Optional[datetime] = None,
+                    limit: Optional[int] = None, offset: Optional[int] = 0,
+                    ascending: bool = True) -> list[Event]:
+        filtered = [event for event in self._events.values() if event.project.code == project]
+        if start_time is not None:
+            filtered = [event for event in filtered if event.start_time >= start_time]
+        if end_time is not None:
+            filtered = [event for event in filtered if event.end_time <= end_time]
+        filtered.sort(key=lambda e: e.start_time, reverse=not ascending)
+        if offset is not None:
+            filtered = filtered[offset:]
+        if limit is not None:
+            filtered = filtered[:limit]
+        return filtered

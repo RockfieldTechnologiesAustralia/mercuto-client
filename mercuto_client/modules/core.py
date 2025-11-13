@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING, Any, Literal, Optional
 
 from pydantic import TypeAdapter
 
-from . import _PayloadType
+from . import PayloadType
 from ._util import BaseModel, serialise_timedelta
 
 if TYPE_CHECKING:
@@ -252,7 +252,7 @@ class MercutoCoreService:
         self._client = client
 
     def healthcheck(self) -> Healthcheck:
-        r = self._client._http_request("/healthcheck", "GET")
+        r = self._client.request("/healthcheck", "GET")
         return Healthcheck.model_validate_json(r.text)
 
     # Projects
@@ -260,11 +260,11 @@ class MercutoCoreService:
     def get_project(self, code: str) -> Project:
         if len(code) == 0:
             raise ValueError("Project code must not be empty")
-        r = self._client._http_request(f'/projects/{code}', 'GET')
+        r = self._client.request(f'/projects/{code}', 'GET')
         return Project.model_validate_json(r.text)
 
     def list_projects(self) -> list[Project]:
-        r = self._client._http_request('/projects', 'GET')
+        r = self._client.request('/projects', 'GET')
         return _ProjectListAdapter.validate_json(r.text)
 
     def create_project(self, name: str, project_number: str, description: str, tenant: str,
@@ -272,7 +272,7 @@ class MercutoCoreService:
                        latitude: Optional[float] = None,
                        longitude: Optional[float] = None) -> Project:
 
-        payload: _PayloadType = {
+        payload: PayloadType = {
             'name': name,
             'project_number': project_number,
             'description': description,
@@ -284,16 +284,16 @@ class MercutoCoreService:
         if longitude is not None:
             payload['longitude'] = longitude
 
-        r = self._client._http_request('/projects', 'PUT', json=payload)
+        r = self._client.request('/projects', 'PUT', json=payload)
         return Project.model_validate_json(r.text)
 
     def ping_project(self, project: str, ip_address: str) -> None:
-        self._client._http_request(
+        self._client.request(
             f'/projects/{project}/ping', 'POST', json={'ip_address': ip_address})
 
     def create_dashboard(self, project_code: str, dashboards: Dashboards) -> None:
         json = dashboards.model_dump()
-        self._client._http_request(
+        self._client.request(
             f'/projects/{project_code}/dashboard', 'POST', json=json)
 
     def set_project_event_detection(self, project: str, datatables: list[str]) -> ProjectEventDetection:
@@ -301,11 +301,11 @@ class MercutoCoreService:
             raise ValueError(
                 'At least one datatable must be provided to enable event detection')
 
-        params: _PayloadType = {
+        params: PayloadType = {
             "enabled": True,
             "datatables": datatables
         }
-        r = self._client._http_request(
+        r = self._client.request(
             f'/projects/{project}/event-detection', 'POST', json=params)
         return ProjectEventDetection.model_validate_json(r.text)
 
@@ -315,25 +315,47 @@ class MercutoCoreService:
         if start_time.tzinfo is None or end_time.tzinfo is None:
             raise ValueError("Timestamp must be timezone aware")
 
-        json: _PayloadType = {
+        json: PayloadType = {
             'project': project,
             'start_time': start_time.isoformat(),
             'end_time': end_time.isoformat(),
         }
-        r = self._client._http_request('/events', 'PUT', json=json)
+        r = self._client.request('/events', 'PUT', json=json)
         return Event.model_validate_json(r.text)
 
-    def list_events(self, project: str) -> list[Event]:
-        params: _PayloadType = {'project_code': project}
-        r = self._client._http_request('/events', 'GET', params=params)
+    def list_events(self, project: str,
+                    start_time: Optional[datetime] = None,
+                    end_time: Optional[datetime] = None,
+                    limit: Optional[int] = None, offset: Optional[int] = 0,
+                    ascending: bool = True) -> list[Event]:
+        """
+        Lists events for a project, optionally filtered by time range.
+        :param project: Project code to list events for.
+        :param start_time: Optional start time to filter events from.
+        :param end_time: Optional end time to filter events to.
+        :param limit: Optional maximum number of events to return. Default is set by API (usually 10).
+        :param offset: Optional offset for pagination.
+        :param ascending: Whether to sort events in ascending order by start time.
+        :return: List of Event objects.
+        """
+        params: PayloadType = {'project_code': project, 'ascending': ascending}
+        if start_time is not None:
+            params['start_time'] = start_time.isoformat()
+        if end_time is not None:
+            params['end_time'] = end_time.isoformat()
+        if limit is not None:
+            params['limit'] = limit
+        if offset is not None:
+            params['offset'] = offset
+        r = self._client.request('/events', 'GET', params=params)
         return _EventsListAdapter.validate_json(r.text)
 
     def get_event(self, event: str) -> Event:
-        r = self._client._http_request(f'/events/{event}', 'GET')
+        r = self._client.request(f'/events/{event}', 'GET')
         return Event.model_validate_json(r.text)
 
     def delete_event(self, event: str) -> None:
-        self._client._http_request(f'/events/{event}', 'DELETE')
+        self._client.request(f'/events/{event}', 'DELETE')
 
     def get_nearest_event(
         self,
@@ -341,14 +363,14 @@ class MercutoCoreService:
         to: datetime,
         maximum_delta: timedelta | None = None,
     ) -> Event:
-        params: _PayloadType = {
+        params: PayloadType = {
             'project_code': project_code,
             'to': to.isoformat(),
         }
         if maximum_delta is not None:
             params['maximum_delta'] = serialise_timedelta(maximum_delta)
 
-        r = self._client._http_request('/events/nearest', 'GET', params=params)
+        r = self._client.request('/events/nearest', 'GET', params=params)
         return Event.model_validate_json(r.text)
 
     def get_event_statistics(
@@ -357,31 +379,31 @@ class MercutoCoreService:
         start_time: datetime,
         end_time: datetime,
     ) -> EventStatisticsOut:
-        params: _PayloadType = {
+        params: PayloadType = {
             'project_code': project_code,
             'start_time': start_time.isoformat(),
             'end_time': end_time.isoformat(),
         }
 
-        r = self._client._http_request('/events/statistics', 'GET', params=params)
+        r = self._client.request('/events/statistics', 'GET', params=params)
         return EventStatisticsOut.model_validate_json(r.text)
 
     def set_event_aggregates(self, project: str, aggregates: list[EventAggregate]) -> None:
-        self._client._http_request('/aggregates', 'PUT',
-                                   json=[agg.model_dump(mode='json') for agg in aggregates],  # type: ignore
-                                   params={'project_code': project})
+        self._client.request('/aggregates', 'PUT',
+                             json=[agg.model_dump(mode='json') for agg in aggregates],  # type: ignore
+                             params={'project_code': project})
 
     # ALERTS
 
     def get_condition(self, code: str) -> Condition:
-        r = self._client._http_request(f'/alerts/conditions/{code}', 'GET')
+        r = self._client.request(f'/alerts/conditions/{code}', 'GET')
         return Condition.model_validate_json(r.text)
 
     def create_condition(self, source: str, description: str, *,
                          lower_bound: Optional[float] = None,
                          upper_bound: Optional[float] = None,
                          neutral_position: float = 0) -> Condition:
-        json: _PayloadType = {
+        json: PayloadType = {
             'source_channel_code': source,
             'description': description,
             'neutral_position': neutral_position
@@ -390,25 +412,25 @@ class MercutoCoreService:
             json['lower_inclusive_bound'] = lower_bound
         if upper_bound is not None:
             json['upper_exclusive_bound'] = upper_bound
-        r = self._client._http_request('/alerts/conditions', 'PUT',  json=json)
+        r = self._client.request('/alerts/conditions', 'PUT',  json=json)
         return Condition.model_validate_json(r.text)
 
     def create_alert_configuration(self, label: str,
                                    conditions: list[str],
                                    contact_group: Optional[str] = None) -> AlertConfiguration:
-        json: _PayloadType = {
+        json: PayloadType = {
             'label': label,
             'conditions': conditions,
 
         }
         if contact_group is not None:
             json['contact_group'] = contact_group
-        r = self._client._http_request(
+        r = self._client.request(
             '/alerts/configurations', 'PUT', json=json)
         return AlertConfiguration.model_validate_json(r.text)
 
     def get_alert_configuration(self, code: str) -> AlertConfiguration:
-        r = self._client._http_request(f'/alerts/configurations/{code}', 'GET')
+        r = self._client.request(f'/alerts/configurations/{code}', 'GET')
         return AlertConfiguration.model_validate_json(r.text)
 
     def list_alert_logs(
@@ -422,7 +444,7 @@ class MercutoCoreService:
             offset: int = 0,
             latest_only: bool = False,
     ) -> AlertSummary:
-        params: _PayloadType = {
+        params: PayloadType = {
             'limit': limit,
             'offset': offset,
             'latest_only': latest_only,
@@ -441,35 +463,35 @@ class MercutoCoreService:
             params['end_time'] = end_time.isoformat() if isinstance(
                 end_time, datetime) else end_time
 
-        r = self._client._http_request('/alerts/logs', 'GET', params=params)
+        r = self._client.request('/alerts/logs', 'GET', params=params)
         return AlertSummary.model_validate_json(r.text)
 
     # DEVICES
 
     def list_device_types(self) -> list[DeviceType]:
-        r = self._client._http_request('/devices/types', 'GET')
+        r = self._client.request('/devices/types', 'GET')
         return _DeviceTypeListAdapter.validate_json(r.text)
 
     def create_device_type(self, description: str, manufacturer: str, model_number: str) -> DeviceType:
-        json: _PayloadType = {
+        json: PayloadType = {
             'description': description,
             'manufacturer': manufacturer,
             'model_number': model_number
         }
-        r = self._client._http_request('/devices/types', 'PUT',  json=json)
+        r = self._client.request('/devices/types', 'PUT',  json=json)
         return DeviceType.model_validate_json(r.text)
 
     def list_devices(self, project_code: str, limit: int, offset: int) -> list[Device]:
-        params: _PayloadType = {
+        params: PayloadType = {
             'project_code': project_code,
             'limit': limit,
             'offset': offset
         }
-        r = self._client._http_request('/devices', 'GET', params=params)
+        r = self._client.request('/devices', 'GET', params=params)
         return _DevicesListAdapter.validate_json(r.text)
 
     def get_device(self, device_code: str) -> Device:
-        r = self._client._http_request(f'/devices/{device_code}', 'GET')
+        r = self._client.request(f'/devices/{device_code}', 'GET')
         return Device.model_validate_json(r.text)
 
     def create_device(self,
@@ -479,7 +501,7 @@ class MercutoCoreService:
                       groups: list[str],
                       location_description: Optional[str] = None,
                       channels: Optional[list[DeviceChannel]] = None) -> Device:
-        json: _PayloadType = {
+        json: PayloadType = {
             'project_code': project_code,
             'label': label,
             'device_type_code': device_type_code,
@@ -489,45 +511,45 @@ class MercutoCoreService:
             json['location_description'] = location_description
         if channels is not None:
             json['channels'] = [channel.model_dump(mode='json') for channel in channels]  # type: ignore[assignment]
-        r = self._client._http_request('/devices', 'PUT', json=json)
+        r = self._client.request('/devices', 'PUT', json=json)
         return Device.model_validate_json(r.text)
 
     # Contacts
 
     def list_contact_groups(self, project: Optional[str] = None) -> list[ContactGroup]:
-        params: _PayloadType = {}
+        params: PayloadType = {}
         if project is not None:
             params['project'] = project
-        r = self._client._http_request(
+        r = self._client.request(
             '/notifications/contact_groups', 'GET', params=params)
         return _ContactGroupListAdapter.validate_json(r.text)
 
     def get_contact_group(self, code: str) -> ContactGroup:
-        r = self._client._http_request(
+        r = self._client.request(
             f'/notifications/contact_groups/{code}', 'GET')
         return ContactGroup.model_validate_json(r.text)
 
     def create_contact_group(self, project: str, label: str, users: dict[str, list[UserContactMethod]]) -> ContactGroup:
-        r = self._client._http_request('/notifications/contact_groups', 'PUT',
-                                       json={
-                                           'project': project,
-                                           'label': label,
-                                           'users': users
-                                       })
+        r = self._client.request('/notifications/contact_groups', 'PUT',
+                                 json={
+                                     'project': project,
+                                     'label': label,
+                                     'users': users
+                                 })
         return ContactGroup.model_validate_json(r.text)
 
     # Reports
     def list_reports(self, project: Optional[str] = None) -> list['ScheduledReport']:
-        params: _PayloadType = {}
+        params: PayloadType = {}
         if project is not None:
             params['project'] = project
-        r = self._client._http_request(
+        r = self._client.request(
             '/reports/scheduled', 'GET', params=params)
         return _ScheduledReportListAdapter.validate_json(r.text)
 
     def create_report(self, project: str, label: str, schedule: str, revision: str,
                       api_key: Optional[str] = None, contact_group: Optional[str] = None) -> ScheduledReport:
-        json: _PayloadType = {
+        json: PayloadType = {
             'project': project,
             'label': label,
             'schedule': schedule,
@@ -535,26 +557,26 @@ class MercutoCoreService:
             'execution_role_api_key': api_key,
             'contact_group': contact_group
         }
-        r = self._client._http_request('/reports/scheduled', 'PUT', json=json)
+        r = self._client.request('/reports/scheduled', 'PUT', json=json)
         return ScheduledReport.model_validate_json(r.text)
 
     def generate_report(self, report: str, timestamp: datetime, mark_as_scheduled: bool = False) -> ScheduledReportLog:
-        r = self._client._http_request(f'/reports/scheduled/{report}/generate', 'PUT', json={
+        r = self._client.request(f'/reports/scheduled/{report}/generate', 'PUT', json={
             'timestamp': timestamp.isoformat(),
             'mark_as_scheduled': mark_as_scheduled
         })
         return ScheduledReportLog.model_validate_json(r.text)
 
     def list_report_logs(self, report: str, project: Optional[str] = None) -> list[ScheduledReportLog]:
-        params: _PayloadType = {}
+        params: PayloadType = {}
         if project is not None:
             params['project'] = project
-        r = self._client._http_request(
+        r = self._client.request(
             f'/reports/scheduled/{report}/logs', 'GET', params=params)
         return _ScheduledReportLogListAdapter.validate_json(r.text)
 
     def get_report_log(self, report: str, log: str) -> ScheduledReportLog:
-        r = self._client._http_request(
+        r = self._client.request(
             f'/reports/scheduled/{report}/logs/{log}', 'GET')
         return ScheduledReportLog.model_validate_json(r.text)
 
@@ -564,6 +586,6 @@ class MercutoCoreService:
             'description': description,
             'source_code_data_url': source_code_data_url,
         }
-        r = self._client._http_request(
+        r = self._client.request(
             '/reports/revisions', 'PUT', json=json, params={'project': project})
         return ReportSourceCodeRevision.model_validate_json(r.text)
