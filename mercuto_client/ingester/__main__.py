@@ -5,16 +5,17 @@ import os
 import signal
 import sys
 import time
-from typing import Callable, List, TypeVar, Optional
-from urllib.parse import urlparse, ParseResult
+from pathlib import Path
+from typing import Any, Callable, Optional, TypeVar
+from urllib.parse import ParseResult, urlparse
 
 import schedule
 
-from .ingester.backup import get_backup_handler
-from .ingester.pid_file import PidFile
 from ..util import get_free_space_excluding_files
+from .backup import get_backup_handler
 from .ftp import simple_ftp_server
 from .mercuto import MercutoIngester
+from .pid_file import PidFile
 from .processor import FileProcessor
 
 logger = logging.getLogger(__name__)
@@ -35,10 +36,14 @@ def call_and_log_error(func: Callable[[], T]) -> T | None:
 
 
 class Status:
+    """
+    Status class to handle running state of the ingester.
+    """
+
     def __init__(self):
         self.running = True
 
-    def stop(self, code, frame):
+    def stop(self, code: Any, frame: Any):
         self.running = False
         print("Stopping")
 
@@ -47,26 +52,26 @@ class Status:
 
 
 def launch_mercuto_ingester(
-            project: str,
-            api_key: str,
-            hostname: str = 'https://api.rockfieldcloud.com.au',
-            verify_ssl: bool = True,
-            pid_file=None,
-            workdir: Optional[str] = '~/.mercuto-ingester',
-            verbose: bool = False,
-            logfile: Optional[str] = None,
-            directory: Optional[str] = None,
-            target_free_space_mb: Optional[int] = None,
-            max_files: Optional[int] = None,
-            mapping: Optional[str] = None,
-            clean: bool = False,
-            ftp_server_username: str = 'logger',
-            ftp_server_password: str = 'password',
-            ftp_server_port: int = 2121,
-            ftp_server_rename: bool = True,
-            max_attempts: int = 1000,
-            backup_location: Optional[List[ParseResult]] = None
-           ):
+    project: str,
+    api_key: str,
+    hostname: str = 'https://api.rockfieldcloud.com.au',
+    verify_ssl: bool = True,
+    pid_file: Optional[Path] = None,
+    workdir: Optional[str] = '~/.mercuto-ingester',
+    verbose: bool = False,
+    logfile: Optional[str] = None,
+    directory: Optional[str] = None,
+    target_free_space_mb: Optional[float] = None,
+    max_files: Optional[int] = None,
+    mapping: Optional[str] = None,
+    clean: bool = False,
+    ftp_server_username: str = 'logger',
+    ftp_server_password: str = 'password',
+    ftp_server_port: int = 2121,
+    ftp_server_rename: bool = True,
+    max_attempts: int = 1000,
+    backup_location: Optional[list[ParseResult]] = None
+):
 
     if backup_location is None:
         backup_location = []
@@ -113,17 +118,8 @@ def launch_mercuto_ingester(
         os.makedirs(ftp_dir, exist_ok=True)
 
         if target_free_space_mb is None and max_files is None:
-          target_free_space_mb = get_free_space_excluding_files(buffer_directory) * 0.25 // (1024 * 1024)  # Convert to MB
-          logging.info(f"Target remaining free space set to {target_free_space_mb} MB based on available disk space.")
-
-        if mapping is not None:
-            import json
-            with open(mapping, 'r') as f:
-                mapping = json.load(f)
-            if not isinstance(mapping, dict):
-                raise ValueError(f"Mapping file {mapping} must contain a JSON object")
-        else:
-            mapping = {}
+            target_free_space_mb = get_free_space_excluding_files(buffer_directory) * 0.25 // (1024 * 1024)  # Convert to MB
+            logging.info(f"Target remaining free space set to {target_free_space_mb} MB based on available disk space.")
 
         logger.info(f"Using work directory: {workdir}")
 
@@ -139,11 +135,17 @@ def launch_mercuto_ingester(
             verify_ssl=verify_ssl,
         )
 
-        ingester.update_mapping(mapping)
+        if mapping is not None:
+            import json
+            with open(mapping, 'r') as f:
+                mapping = json.load(f)
+            if not isinstance(mapping, dict):
+                raise ValueError(f"Mapping file {mapping} must contain a JSON object")
+            ingester.update_mapping(mapping)
 
-        pre_processing_handlers: List[Callable[[str], bool]] = [get_backup_handler(loc) for loc in backup_location]
-        processor_callbacks: List[Callable[[str], bool]] = [ingester.process_file]
-        post_processing_handlers: List[Callable[[str], bool]] = []
+        pre_processing_handlers: list[Callable[[str], bool]] = [get_backup_handler(loc) for loc in backup_location]
+        processor_callbacks: list[Callable[[str], bool]] = [ingester.process_file]
+        post_processing_handlers: list[Callable[[str], bool]] = []
 
         all_handlers = pre_processing_handlers + processor_callbacks + post_processing_handlers
 
@@ -162,9 +164,9 @@ def launch_mercuto_ingester(
                                callback=processor.add_file_to_db, rename=ftp_server_rename,
                                workdir=ftp_dir):
             call_and_log_error(ingester.ping)
-            schedule.every(60).seconds.do(call_and_log_error, ingester.ping)
-            schedule.every(5).seconds.do(call_and_log_error, processor.process_next_file)
-            schedule.every(2).minutes.do(call_and_log_error, processor.cleanup_old_files)
+            schedule.every(60).seconds.do(call_and_log_error, ingester.ping)  # type: ignore[attr-defined]
+            schedule.every(5).seconds.do(call_and_log_error, processor.process_next_file)  # type: ignore[attr-defined]
+            schedule.every(2).minutes.do(call_and_log_error, processor.cleanup_old_files)  # type: ignore[attr-defined]
 
             status = Status()
             signal.signal(signal.SIGTERM, status.stop)
@@ -231,32 +233,32 @@ def main():
                         help='Disable SSL verification',
                         default=False)
     parser.add_argument('-b', '--backup_location', action="append",
-                        help='Backup location to store ingested files.',
-                        type=urlparse
-                        )
-    parser.add_argument('-e', '--pid-file', help='Ths location to create the PID file', default=None)
+                        help='Backup location to store ingested files. Must be a valid URL, e.g. scp://user@host/path. '
+                        'Can be specified multiple times.',
+                        type=urlparse)
+    parser.add_argument('-e', '--pid-file', help='Ths location to create the PID file', type=Path, default=None)
 
     args = parser.parse_args()
 
     launch_mercuto_ingester(
-            project=args.project,
-            api_key=args.api_key,
-            verify_ssl=not args.insecure,
-            pid_file=args.pid_file,
-            workdir=args.workdir,
-            verbose=args.verbose,
-            logfile=args.logfile,
-            directory=args.directory,
-            target_free_space_mb=args.target_free_space_mb,
-            max_files=args.max_files,
-            mapping=args.mapping,
-            clean=args.clean,
-            ftp_server_username=args.username,
-            ftp_server_password=args.password,
-            ftp_server_port=args.port,
-            ftp_server_rename=not args.no_rename,
-            max_attempts=args.max_attempts,
-            backup_location=args.backup_location
+        project=args.project,
+        api_key=args.api_key,
+        verify_ssl=not args.insecure,
+        pid_file=args.pid_file,
+        workdir=args.workdir,
+        verbose=args.verbose,
+        logfile=args.logfile,
+        directory=args.directory,
+        target_free_space_mb=args.target_free_space_mb,
+        max_files=args.max_files,
+        mapping=args.mapping,
+        clean=args.clean,
+        ftp_server_username=args.username,
+        ftp_server_password=args.password,
+        ftp_server_port=args.port,
+        ftp_server_rename=not args.no_rename,
+        max_attempts=args.max_attempts,
+        backup_location=args.backup_location
     )
 
 

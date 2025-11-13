@@ -4,13 +4,19 @@ import logging
 import sys
 from pathlib import Path
 
-from zc.lockfile import LockFile, LockError  # type: ignore[import-untyped]
+from zc.lockfile import LockError, LockFile  # type: ignore[import-untyped]
 
 logger = logging.getLogger(__name__)
 
 
 class PidFile:
-    def __init__(self, lock_file: Path | None = None, content_template='{pid}'):
+    """
+    Context manager for creating and removing a PID lock file.
+    :param lock_file: Path to the lock file to create. If None, no lock file is created.
+    :param content_template: Template for the content of the lock file. Default is '{pid}'.
+    """
+
+    def __init__(self, lock_file: Path | None = None, content_template: str = '{pid}'):
         self.content_template = content_template
         self.lock_path = Path(lock_file) if lock_file else None
         self.lock: LockFile | None = None
@@ -26,7 +32,7 @@ class PidFile:
             atexit.register(self.__cleanup)
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(self, exc_type: type | None, exc_val: BaseException | None, exc_tb: object | None) -> None:
         if self.lock is not None:
             self.lock.close()
             self.lock = None

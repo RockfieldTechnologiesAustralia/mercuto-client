@@ -1,11 +1,11 @@
 import logging
-
 import shutil
 import subprocess
 import sys
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from pathlib import Path, PosixPath
-from typing import Callable, Optional, Tuple, Dict
+from typing import Any, Callable, Optional
 from urllib.parse import ParseResult, parse_qs, unquote
 
 import requests
@@ -13,13 +13,21 @@ import requests
 logger = logging.getLogger(__name__)
 
 
-class Backup:
+class IBackupHandler(ABC):
+    """
+    Abstract base class for backup handlers.
+    """
+
     def __init__(self, url: ParseResult):
         self.url = url
         self.validate_url()
         logger.debug(f'{self} backup location set to: {url.geturl()}')
 
     def __call__(self, filename: str) -> bool:
+        """
+        Provide a callable interface to process a file.
+        :param filename: The file to process.
+        """
         try:
             result = self.process_file(filename)
             if not result:
@@ -30,50 +38,83 @@ class Backup:
         except Exception:
             return False
 
-    def decode_query(self):
+    def decode_query(self) -> dict[str, Any]:
+        """
+        Decodes the query parameters from the URL.
+        :return: A dictionary of query parameters (e.g. http://example.com?param1=value1 ==> {'param1': 'value1'})
+        """
         return parse_qs(unquote(self.url.query))
 
     def validate_url(self):
+        """
+        Validates the URL components.
+         Raises an exception if the URL is invalid.
+
+        Should be implemented by subclasses
+        """
         pass
 
+    @abstractmethod
     def process_file(self, filename: str) -> bool:
+        """
+        Processes the given file.
+        Should be implemented by subclasses.
+        """
         raise NotImplementedError()
 
 
-@dataclass
-class SCPBackupParams:
-    private_key: Optional[Path] = None
-    script: Optional[str] = None
+class CSCPBackup(IBackupHandler):
+    """
+    Compressed SCP Backup handler (cscp://).
+    Uses SCP to copy files to a remote server, with optional post-transfer script execution.
+    Use query parameters to specify additional options:
+    - private_key: Path to the private key file for authentication.
+    - script: A script to run on the remote server after file transfer. The script can use
+      the placeholder '{destination}' to refer to the path of the transferred file.
+    """
+    @dataclass
+    class SCPBackupParams:
+        private_key: Optional[Path] = None
+        script: Optional[str] = None
 
-    @staticmethod
-    def load(config: dict) -> 'SCPBackupParams':
-        return SCPBackupParams(**config)
+        @staticmethod
+        def load(config: dict[str, Any]) -> 'CSCPBackup.SCPBackupParams':
+            """
+            Loads SCPBackupParams from a configuration dictionary.
+            :param config: Configuration dictionary.
+            :return: An instance of CSCPBackup.SCPBackupParams.
+            """
+            return CSCPBackup.SCPBackupParams(**config)
 
-    @staticmethod
-    def load_qs(query: dict) -> 'SCPBackupParams':
-        result = {}
-        keys = list(query.keys())
-        known_keys = ['private_key', 'script']
-        for _key in known_keys:
-            if _key in query:
-                if len(query[_key]) > 1:
-                    raise RuntimeError(f"Multiple {_key} entries found")
-                result[_key] = query[_key][0]
-                keys.remove(_key)
-        if len(keys) > 0:
-            raise RuntimeError(f"Unknown key {keys}")
+        @staticmethod
+        def load_qs(query: dict[str, Any]) -> 'CSCPBackup.SCPBackupParams':
+            """
+            Load SCPBackupParams from a query string dictionary.
+            :param query: Query string dictionary.
+            """
+            result: dict[str, Any] = {}
+            keys = list(query.keys())
+            known_keys = ['private_key', 'script']
+            for _key in known_keys:
+                if _key in query:
+                    if len(query[_key]) > 1:
+                        raise RuntimeError(f"Multiple {_key} entries found")
+                    result[_key] = query[_key][0]
+                    keys.remove(_key)
+            if len(keys) > 0:
+                raise RuntimeError(f"Unknown key {keys}")
 
-        return SCPBackupParams.load(result)
+            return CSCPBackup.SCPBackupParams.load(result)
 
-
-class CSCPBackup(Backup):
     def __init__(self, url: ParseResult):
-        self.params: Optional[SCPBackupParams] = None
+        self.params: Optional[CSCPBackup.SCPBackupParams] = None
         super().__init__(url)
 
     def validate_url(self):
+        if self.url.hostname is None:
+            raise RuntimeError("No hostname specified for backup")
         query = self.decode_query()
-        self.params = SCPBackupParams.load_qs(query)
+        self.params = CSCPBackup.SCPBackupParams.load_qs(query)
 
     def process_file(self, filename: str) -> bool:
         if self.send_file(filename):
@@ -118,7 +159,7 @@ class CSCPBackup(Backup):
             print(e.stderr.decode("utf-8"), file=sys.stderr)
             return False
 
-    def run_script(self, filename):
+    def run_script(self, filename: str) -> bool:
         if self.params is None:
             return True
         elif self.params.script is None:
@@ -136,11 +177,12 @@ class CSCPBackup(Backup):
             command.append('-p')
             command.append(str(port))
 
-            if self.params is not None:
-                if self.params.private_key is not None:
-                    command.append('-i')
-                    command.append(str(self.params.private_key))
+            if self.params.private_key is not None:
+                command.append('-i')
+                command.append(str(self.params.private_key))
 
+            if self.url.hostname is None:
+                raise RuntimeError("No hostname specified for backup")
             command.append(self.url.hostname)
 
             dest_folder = PosixPath(self.url.path)
@@ -161,7 +203,12 @@ class CSCPBackup(Backup):
             return False
 
 
-class FileBackup(Backup):
+class FileBackup(IBackupHandler):
+    """
+    File Backup handler (file://)
+    Copies files to a specified local directory.
+    """
+
     def __init__(self, url: ParseResult):
         self.backup_path: Optional[Path] = None
         super().__init__(url)
@@ -197,32 +244,29 @@ class FileBackup(Backup):
         return True
 
 
-@dataclass
-class HTTPProcessResult:
-    result: bool
-    sha512_hash: str
-    processed: bool
-    status_code: int
-    response: Dict
+class HTTPBackup(IBackupHandler):
+    """
+    HTTP Backup handler (http:// or https://).
+    Uses HTTP POST to send files to a specified URL.
+    """
 
+    def validate_url(self):
+        if self.url.scheme.lower() not in ['http', 'https']:
+            raise ValueError(f"{self} url scheme must be 'http' or 'https'")
 
-class HTTPBackup(Backup):
-
-    def _process_file(self, filename: str) -> HTTPProcessResult:
+    def _process_file(self, filename: str) -> tuple[bool, int]:
         with open(filename, "rb") as f:
             files = {"file": (Path(filename).name, f, "text/plain")}
             response = requests.post(self.url.geturl(), files=files)
             response_data = response.json()
             result = response_data.get('result', False)
-            sha512_hash = response_data.get('sha512_hash', None)
-            processed = response_data.get('processed', False)
 
             logger.debug(f"HTTP Response: {response.status_code} - {response_data}")
-            return HTTPProcessResult(result, sha512_hash, processed, response.status_code, response_data)
+            return result, response.status_code
 
     def process_file(self, filename: str) -> bool:
-        result = self._process_file(filename)
-        return result.result and result.status_code == 200
+        result, status_code = self._process_file(filename)
+        return result and status_code == 200
 
 
 def get_backup_handler(url: ParseResult) -> Callable[[str], bool]:
