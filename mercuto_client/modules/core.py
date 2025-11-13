@@ -323,8 +323,30 @@ class MercutoCoreService:
         r = self._client.request('/events', 'PUT', json=json)
         return Event.model_validate_json(r.text)
 
-    def list_events(self, project: str) -> list[Event]:
-        params: PayloadType = {'project_code': project}
+    def list_events(self, project: str,
+                    start_time: Optional[datetime] = None,
+                    end_time: Optional[datetime] = None,
+                    limit: Optional[int] = None, offset: Optional[int] = 0,
+                    ascending: bool = True) -> list[Event]:
+        """
+        Lists events for a project, optionally filtered by time range.
+        :param project: Project code to list events for.
+        :param start_time: Optional start time to filter events from.
+        :param end_time: Optional end time to filter events to.
+        :param limit: Optional maximum number of events to return. Default is set by API (usually 10).
+        :param offset: Optional offset for pagination.
+        :param ascending: Whether to sort events in ascending order by start time.
+        :return: List of Event objects.
+        """
+        params: PayloadType = {'project_code': project, 'ascending': ascending}
+        if start_time is not None:
+            params['start_time'] = start_time.isoformat()
+        if end_time is not None:
+            params['end_time'] = end_time.isoformat()
+        if limit is not None:
+            params['limit'] = limit
+        if offset is not None:
+            params['offset'] = offset
         r = self._client.request('/events', 'GET', params=params)
         return _EventsListAdapter.validate_json(r.text)
 
