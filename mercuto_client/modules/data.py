@@ -10,7 +10,7 @@ from pydantic import TypeAdapter
 
 from ..exceptions import MercutoClientException, MercutoHTTPException
 from ..util import batched
-from . import _PayloadType, _raise_for_response
+from . import PayloadType, raise_for_response
 from ._util import BaseModel, serialise_timedelta
 
 if TYPE_CHECKING:
@@ -145,14 +145,14 @@ class MercutoDataService:
         self._path = path
 
     def healthcheck(self) -> Healthcheck:
-        r = self._client._http_request(f"{self._path}/healthcheck", "GET")
+        r = self._client.request(f"{self._path}/healthcheck", "GET")
         return Healthcheck.model_validate_json(r.text)
 
     def refresh_continuous_aggregates(self) -> None:
         """
         Request a refresh of continuous aggregates on all tables
         """
-        self._client._http_request(f"{self._path}/meta/refresh-aggregates", "POST")
+        self._client.request(f"{self._path}/meta/refresh-aggregates", "POST")
 
     """
     Channels
@@ -174,9 +174,9 @@ class MercutoDataService:
         if metric:
             params['metric'] = metric
 
-        all_channels = []
+        all_channels: list[Channel] = []
         while True:
-            r = self._client._http_request(f'{self._path}/channels', 'GET', params=params)
+            r = self._client.request(f'{self._path}/channels', 'GET', params=params)
 
             channels = _ChannellistAdapter.validate_json(r.text)
             all_channels.extend(channels)
@@ -186,16 +186,16 @@ class MercutoDataService:
         return all_channels
 
     def get_channel(self, code: str) -> Optional[Channel]:
-        r = self._client._http_request(f'{self._path}/channels/{code}', 'GET', raise_for_status=False)
+        r = self._client.request(f'{self._path}/channels/{code}', 'GET', raise_for_status=False)
         if r.status_code == 404:
             return None
-        _raise_for_response(r)
+        raise_for_response(r)
         return Channel.model_validate_json(r.text)
 
     def update_channel(self, code: str, label: Optional[str] = None, units: Optional[str] = None,
                        metric: Optional[str] = None, multiplier: Optional[float] = None,
                        offset: Optional[float] = None) -> Channel:
-        payload: _PayloadType = {}
+        payload: PayloadType = {}
         if label is not None:
             payload['label'] = label
         if units is not None:
@@ -207,11 +207,11 @@ class MercutoDataService:
         if offset is not None:
             payload['offset'] = offset
 
-        r = self._client._http_request(f'{self._path}/channels/{code}', 'PATCH', json=payload)
+        r = self._client.request(f'{self._path}/channels/{code}', 'PATCH', json=payload)
         return Channel.model_validate_json(r.text)
 
     def delete_channel(self, code: str) -> bool:
-        r = self._client._http_request(f'{self._path}/channels/{code}', 'DELETE')
+        r = self._client.request(f'{self._path}/channels/{code}', 'DELETE')
         return r.status_code == 204
 
     def create_channel(self, project: str,
@@ -225,7 +225,7 @@ class MercutoDataService:
                        aggregate: Optional[str] = None,
                        source: Optional[str] = None,
                        metric: Optional[str] = None) -> Channel:
-        payload: _PayloadType = {
+        payload: PayloadType = {
             'project': project,
             'label': label,
             'classification': classification.value,
@@ -249,7 +249,7 @@ class MercutoDataService:
         if metric is not None:
             payload['metric'] = metric
 
-        r = self._client._http_request(f'{self._path}/channels', 'PUT', json=payload)
+        r = self._client.request(f'{self._path}/channels', 'PUT', json=payload)
         return Channel.model_validate_json(r.text)
 
     """
@@ -265,7 +265,7 @@ class MercutoDataService:
         aggregate: Optional[str] = None,
         metric: Optional[str] = None
     ) -> Expression:
-        payload: _PayloadType = {
+        payload: PayloadType = {
             "project": project,
             "label": label,
             "expression": expression,
@@ -277,11 +277,11 @@ class MercutoDataService:
         if metric is not None:
             payload["metric"] = metric
 
-        r = self._client._http_request(f'{self._path}/expressions', 'PUT', json=payload)
+        r = self._client.request(f'{self._path}/expressions', 'PUT', json=payload)
         return Expression.model_validate_json(r.text)
 
     def delete_expression(self, code: str) -> bool:
-        r = self._client._http_request(f'{self._path}/expressions/{code}', 'DELETE')
+        r = self._client.request(f'{self._path}/expressions/{code}', 'DELETE')
         return r.status_code == 202
 
     """
@@ -289,24 +289,24 @@ class MercutoDataService:
     """
 
     def create_datatable(self, project: str, name: str, sampling_period: timedelta, column_labels: Collection[str]) -> Datatable:
-        payload: _PayloadType = {
+        payload: PayloadType = {
             "project": project,
             "name": name,
             "sampling_period": serialise_timedelta(sampling_period),
             "column_labels": list(column_labels),
         }
-        r = self._client._http_request(f'{self._path}/datatables', 'PUT', json=payload)
+        r = self._client.request(f'{self._path}/datatables', 'PUT', json=payload)
         return Datatable.model_validate_json(r.text)
 
     def list_datatables(self, project: str) -> list[Datatable]:
-        datatables = []
+        datatables: list[Datatable] = []
         params: dict[str, Any] = {
             "project": project,
             "limit": 100,
             "offset": 0,
         }
         while True:
-            r = self._client._http_request(f'{self._path}/datatables', 'GET', params=params)
+            r = self._client.request(f'{self._path}/datatables', 'GET', params=params)
 
             batch = _DatatablelistAdapter.validate_json(r.text)
             datatables.extend(batch)
@@ -320,15 +320,15 @@ class MercutoDataService:
     """
 
     def list_units(self) -> list[Units]:
-        r = self._client._http_request(f'{self._path}/units', 'GET')
+        r = self._client.request(f'{self._path}/units', 'GET')
         return _UnitslistAdapter.validate_json(r.text)
 
     def create_unit(self, name: str, unit: str) -> Units:
-        payload: _PayloadType = {
+        payload: PayloadType = {
             "name": name,
             "unit": unit,
         }
-        r = self._client._http_request(f'{self._path}/units', 'PUT', json=payload)
+        r = self._client.request(f'{self._path}/units', 'PUT', json=payload)
         return Units.model_validate_json(r.text)
 
     """
@@ -354,7 +354,7 @@ class MercutoDataService:
         if channels is None and classification is None:
             raise ValueError("Must supply either channels or classification.")
 
-        payload: _PayloadType = {
+        payload: PayloadType = {
             "start_time": start_time.isoformat(),
             "end_time": end_time.isoformat(),
             "frame_format": frame_format.value,
@@ -374,7 +374,7 @@ class MercutoDataService:
         if aggregation is not None:
             payload["aggregation"] = aggregation.model_dump(mode='json')
 
-        r = self._client._http_request(
+        r = self._client.request(
             f'{self._path}/requests', 'POST',
             json=payload,
             params={"timeout": timeout}
@@ -382,7 +382,7 @@ class MercutoDataService:
         return GetStatusRequestResponse.model_validate_json(r.text)
 
     def get_request(self, request_id: str) -> GetStatusRequestResponse:
-        r = self._client._http_request(f'{self._path}/requests/{request_id}', 'GET')
+        r = self._client.request(f'{self._path}/requests/{request_id}', 'GET')
         return GetStatusRequestResponse.model_validate_json(r.text)
 
     """
@@ -425,8 +425,6 @@ class MercutoDataService:
             poll_interval=poll_interval,
             timeout=timeout
         )
-        if result.result_url is None:
-            raise MercutoClientException("Failed to obtain presigned URL.")
         return result.result_url
 
     def load_data_request(
@@ -499,7 +497,7 @@ class MercutoDataService:
         """
         for batch in batched(samples, 5000):
             payload = _SecondarySamplelistAdapter.dump_python(list(batch), mode='json')
-            self._client._http_request(
+            self._client.request(
                 f'{self._path}/samples/secondary', 'PUT', json=payload, params={"project": project}
             )
 
@@ -515,7 +513,7 @@ class MercutoDataService:
         """
         for batch in batched(samples, 5000):
             payload = _MetricSamplelistAdapter.dump_python(list(batch), mode='json')
-            self._client._http_request(
+            self._client.request(
                 f'{self._path}/samples/metric', 'PUT', json=payload, params={"project": project}
             )
 
@@ -531,13 +529,13 @@ class MercutoDataService:
         """
         Load up to 100 secondary samples.
         """
-        params: _PayloadType = {
+        params: PayloadType = {
             "channels": list(channels),
             "start_time": start_time.isoformat(),
             "end_time": end_time.isoformat(),
             "limit": limit
         }
-        r = self._client._http_request(
+        r = self._client.request(
             f'{self._path}/samples/secondary', 'GET', params=params
         )
 
@@ -555,7 +553,7 @@ class MercutoDataService:
         """
         Load up to 100 metric samples.
         """
-        params: _PayloadType = {
+        params: PayloadType = {
             "limit": limit
         }
         if project is not None:
@@ -568,7 +566,7 @@ class MercutoDataService:
             params["end_time"] = end_time.isoformat()
         if events is not None:
             params["event"] = list(events)
-        r = self._client._http_request(
+        r = self._client.request(
             f'{self._path}/samples/metric', 'GET', params=params
         )
 
@@ -582,10 +580,10 @@ class MercutoDataService:
         return samples[0].value if samples else None
 
     def delete_metric_samples(self, project: str, event: str, channels: Optional[Collection[str]] = None) -> None:
-        params: _PayloadType = {"project": project, "event": event}
+        params: PayloadType = {"project": project, "event": event}
         if channels is not None:
             params["channels"] = list(channels)
-        self._client._http_request(
+        self._client.request(
             f'{self._path}/samples/metric', 'DELETE', params=params
         )
 
@@ -599,7 +597,7 @@ class MercutoDataService:
             ctx = nullcontext(file)  # type: ignore
             filename = filename or 'file.dat'
 
-        params: _PayloadType = {
+        params: PayloadType = {
             "project": project,
             "datatable": datatable,
         }
@@ -607,16 +605,16 @@ class MercutoDataService:
             params["timezone"] = timezone
 
         with ctx as f:
-            self._client._http_request(f'{self._path}/files/upload/small', 'POST',
-                                       params=params,
-                                       files={'file': (filename, f, 'text/csv')})
+            self._client.request(f'{self._path}/files/upload/small', 'POST',
+                                 params=params,
+                                 files={'file': (filename, f, 'text/csv')})
 
     def get_latest_samples(self, project: str, include_primary: bool = True) -> list[LatestDataSample]:
-        params: _PayloadType = {
+        params: PayloadType = {
             "project": project,
             "include_primary": include_primary
         }
-        r = self._client._http_request(
+        r = self._client.request(
             f'{self._path}/statistics/latest-samples', 'GET', params=params
         )
 

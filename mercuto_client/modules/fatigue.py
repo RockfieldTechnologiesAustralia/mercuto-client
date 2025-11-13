@@ -6,7 +6,7 @@ from pydantic import Field, TypeAdapter
 if TYPE_CHECKING:
     from ..client import MercutoClient
 
-from . import _PayloadType
+from . import PayloadType
 from ._util import BaseModel
 
 
@@ -55,14 +55,14 @@ class MercutoFatigueService:
         self._path = path
 
     def healthcheck(self) -> Healthcheck:
-        r = self._client._http_request(f"{self._path}/healthcheck", "GET")
+        r = self._client.request(f"{self._path}/healthcheck", "GET")
         return Healthcheck.model_validate_json(r.text)
 
     # --- Rainflow routes ---
 
     def list_rainflow_config(self, project: str) -> list[RainflowConfiguration]:
-        params: _PayloadType = {"project": project}
-        r = self._client._http_request(f"{self._path}/rainflow/setup", "GET", params=params)
+        params: PayloadType = {"project": project}
+        r = self._client.request(f"{self._path}/rainflow/setup", "GET", params=params)
         return _RainflowConfigurationlistAdapter.validate_json(r.text)
 
     def setup_rainflow(
@@ -74,7 +74,7 @@ class MercutoFatigueService:
         reservoir_adjustment: bool,
         sources: list[str]
     ) -> RainflowConfiguration:
-        payload: _PayloadType = {
+        payload: PayloadType = {
             "project": project,
             "max_bins": max_bins,
             "bin_size": bin_size,
@@ -82,18 +82,18 @@ class MercutoFatigueService:
             "reservoir_adjustment": reservoir_adjustment,
             "sources": sources,
         }
-        r = self._client._http_request(f"{self._path}/rainflow/setup", "PUT", json=payload)
+        r = self._client.request(f"{self._path}/rainflow/setup", "PUT", json=payload)
         return RainflowConfiguration.model_validate_json(r.text)
 
     def get_cycle_counts(
         self, project: str, start_time: datetime, end_time: datetime
     ) -> bytes:
-        params: _PayloadType = {
+        params: PayloadType = {
             "project": project,
             "start_time": start_time.isoformat(),
             "end_time": end_time.isoformat(),
         }
-        r = self._client._http_request(
+        r = self._client.request(
             f"{self._path}/rainflow/cycle_counts", "GET", params=params, stream=True
         )
         return r.content
@@ -101,13 +101,13 @@ class MercutoFatigueService:
     def delete_cycle_counts(
         self, project: str, start_time: datetime, end_time: datetime, ignore_if_not_configured: bool = False
     ) -> None:
-        params: _PayloadType = {
+        params: PayloadType = {
             "project": project,
             "start_time": start_time.isoformat(),
             "end_time": end_time.isoformat(),
             "ignore_if_not_configured": ignore_if_not_configured,
         }
-        self._client._http_request(
+        self._client.request(
             f"{self._path}/rainflow/cycle_counts", "DELETE", params=params
         )
 
@@ -120,7 +120,7 @@ class MercutoFatigueService:
         url_expiry: Optional[datetime] = None,
         ignore_if_not_configured: bool = False
     ) -> None:
-        payload: _PayloadType = {
+        payload: PayloadType = {
             "project": project,
             "event": event,
             "presigned_url": presigned_url,
@@ -129,15 +129,15 @@ class MercutoFatigueService:
         if url_expiry is not None:
             payload["url_expiry"] = url_expiry.isoformat()
         params = {"ignore_if_not_configured": ignore_if_not_configured}
-        self._client._http_request(
+        self._client.request(
             f"{self._path}/rainflow/cycle_counts/calculate", "PUT", json=payload, params=params
         )
 
     # --- Fatigue Connections routes ---
 
     def get_connections(self, project: str) -> list[FatigueConnection]:
-        params: _PayloadType = {"project": project}
-        r = self._client._http_request(f"{self._path}/connections", "GET", params=params)
+        params: PayloadType = {"project": project}
+        r = self._client.request(f"{self._path}/connections", "GET", params=params)
         return _FatigueConnectionlistAdapter.validate_json(r.text)
 
     def add_connection(
@@ -154,7 +154,7 @@ class MercutoFatigueService:
         initial_damage: float,
         sources: list[str]
     ) -> FatigueConnection:
-        payload: _PayloadType = {
+        payload: PayloadType = {
             "project": project,
             "label": label,
             "multiplier": multiplier,
@@ -167,23 +167,23 @@ class MercutoFatigueService:
             "initial_damage": initial_damage,
             "sources": sources,
         }
-        r = self._client._http_request(f"{self._path}/connections", "PUT", json=payload)
+        r = self._client.request(f"{self._path}/connections", "PUT", json=payload)
         return FatigueConnection.model_validate_json(r.text)
 
     def delete_connection(self, connection_code: str) -> None:
-        self._client._http_request(f"{self._path}/connections/{connection_code}", "DELETE")
+        self._client.request(f"{self._path}/connections/{connection_code}", "DELETE")
 
     # --- Connection Data routes ---
 
     def get_connection_remnant_capacity(
         self, project: str, start_time: datetime, end_time: datetime
     ) -> list[ConnectionRemnantCapacity]:
-        params: _PayloadType = {
+        params: PayloadType = {
             "project": project,
             "start_time": start_time.isoformat(),
             "end_time": end_time.isoformat(),
         }
-        r = self._client._http_request(
+        r = self._client.request(
             f"{self._path}/connection_data/remnant-capacity", "GET", params=params
         )
         return _ConnectionRemnantCapacitylistAdapter.validate_json(r.text)
