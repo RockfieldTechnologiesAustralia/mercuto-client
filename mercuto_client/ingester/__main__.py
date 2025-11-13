@@ -148,7 +148,7 @@ if __name__ == '__main__':
         db_path=database_path,
         process_callback=ingester.process_file,
         max_attempts=args.max_attempts,
-        free_space_mb=target_free_space_mb,
+        target_free_space_mb=target_free_space_mb,
         max_files=args.max_files)
 
     processor.scan_existing_files()

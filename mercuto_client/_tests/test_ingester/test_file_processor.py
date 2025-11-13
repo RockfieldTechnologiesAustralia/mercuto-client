@@ -2,7 +2,7 @@ import os
 import sqlite3
 import tempfile
 import time
-from typing import Generator, Tuple
+from typing import Generator, Iterator, Tuple
 
 import pytest
 
@@ -14,25 +14,35 @@ def mock_process_callback(filepath: str) -> bool:
 
 
 @pytest.fixture
-def temp_env() -> Generator[Tuple[FileProcessor, str, str], None, None]:
+def buffer_directory() -> Iterator[str]:
+    with tempfile.TemporaryDirectory() as temp_dir:
+        yield temp_dir
+
+
+@pytest.fixture
+def work_directory() -> Iterator[str]:
+    with tempfile.TemporaryDirectory() as temp_dir:
+        yield temp_dir
+
+
+@pytest.fixture
+def database_path(work_directory: str) -> Iterator[str]:
+    yield os.path.join(work_directory, "test_buffer.db")
+
+
+@pytest.fixture
+def temp_env(buffer_directory: str, database_path: str) -> Generator[Tuple[FileProcessor, str, str], None, None]:
     """Setup temporary directory and database"""
-    buffer_dir: str = tempfile.mkdtemp()
-    workdir = tempfile.mkdtemp()
-    db_path: str = os.path.join(workdir, "test_buffer.db")
 
     processor: FileProcessor = FileProcessor(
-        buffer_dir=buffer_dir,
-        db_path=db_path,
+        buffer_dir=buffer_directory,
+        db_path=database_path,
         max_files=3,
         max_attempts=2,
         process_callback=mock_process_callback
     )
 
-    yield processor, buffer_dir, db_path
-
-    # Cleanup
-    if os.path.exists(db_path):
-        os.remove(db_path)
+    yield processor, buffer_directory, database_path
 
 
 def test_init_db(temp_env: Tuple[FileProcessor, str, str]) -> None:
@@ -208,3 +218,156 @@ def test_scan_existing_files_that_havnt_been_processed(temp_env: Tuple[FileProce
     files: list[tuple[str]] = cursor.fetchall()
     conn.close()
     assert files == [('file0.txt',), ('file1.txt',), ('file2.txt',), ('file3.txt',), ('file4.txt',)]
+
+
+def test_ensure_free_space(database_path: str, buffer_directory: str) -> None:
+    """Ensure that keeping X MB free space works correctly"""
+    remaining_free_space_mb = 501
+
+    def mock_free_space_checker(dir: str) -> float:
+        """
+        Mock free space checker that returns a controlled value.
+        Returns remaining_free_space_mb - number of files in the buffer directory.
+        """
+        n_files = len(os.listdir(buffer_directory))
+        nonlocal remaining_free_space_mb
+        return remaining_free_space_mb - n_files
+
+    processor = FileProcessor(
+        buffer_dir=buffer_directory,
+        db_path=database_path,
+        max_files=10,
+        max_attempts=2,
+        process_callback=mock_process_callback,
+        target_free_space_mb=500,
+        free_space_checker=mock_free_space_checker
+    )
+
+    def create_and_add_file(name: str) -> str:
+        nonlocal buffer_directory, processor
+        file_path = os.path.join(buffer_directory, name)
+        with open(file_path, 'w') as f:
+            f.write("Test content")
+        processor.add_file_to_db(file_path)
+        return file_path
+
+    create_and_add_file('success_file_1.txt')
+    create_and_add_file('success_file_2.txt')
+    create_and_add_file('success_file_3.txt')
+    create_and_add_file('success_file_4.txt')
+
+    # There should be 4 files on disk
+    assert len(os.listdir(buffer_directory)) == 4
+
+    # Trigger cleanup, should not delete anything as we have enough free space
+    remaining_free_space_mb = 504
+    processor.cleanup_old_files()
+    assert len(os.listdir(buffer_directory)) == 4
+
+    # Reduce free space to trigger cleanup
+    remaining_free_space_mb = 502
+    processor.cleanup_old_files()
+    # This should have deleted the oldest two files to maintain 500 MB free space
+    # E.g. no deletes gives 498 MB free space, deleting one file gives 499 MB free space,
+    # deleting two files gives 500 MB free space
+    assert len(os.listdir(buffer_directory)) == 2
+    remaining_files = os.listdir(buffer_directory)
+    assert set(remaining_files) == {'success_file_3.txt', 'success_file_4.txt'}
+
+
+def test_ensure_free_space_with_externally_modified_files(database_path: str, buffer_directory: str) -> None:
+    """
+    Ensure that keeping X MB free space works correctly under the following:
+    - Files may be deleted from disk externally (not via the processor)
+    """
+    remaining_free_space_mb = 501
+
+    def mock_free_space_checker(dir: str) -> float:
+        """
+        Mock free space checker that returns a controlled value.
+        Returns remaining_free_space_mb - number of files in the buffer directory.
+        """
+        n_files = len(os.listdir(buffer_directory))
+        nonlocal remaining_free_space_mb
+        return remaining_free_space_mb - n_files
+
+    processor = FileProcessor(
+        buffer_dir=buffer_directory,
+        db_path=database_path,
+        max_files=10,
+        max_attempts=2,
+        process_callback=mock_process_callback,
+        target_free_space_mb=500,
+        free_space_checker=mock_free_space_checker
+    )
+
+    def create_and_add_file(name: str) -> str:
+        nonlocal buffer_directory, processor
+        file_path = os.path.join(buffer_directory, name)
+        with open(file_path, 'w') as f:
+            f.write("Test content")
+        processor.add_file_to_db(file_path)
+        return file_path
+
+    file1 = create_and_add_file('success_file_1.txt')
+    file2 = create_and_add_file('success_file_2.txt')
+    create_and_add_file('success_file_3.txt')
+    create_and_add_file('success_file_4.txt')
+
+    # There should be 4 files on disk
+    assert len(os.listdir(buffer_directory)) == 4
+
+    # Manually delete files 1 and 2 to simulate external deletion
+    os.remove(file1)
+    os.remove(file2)
+
+    # Reduce free space to trigger cleanup
+    remaining_free_space_mb = 100
+    processor.cleanup_old_files()
+    # This should still delete all files (even though 1 and 2 are already gone) to maintain 500 MB free space
+    # The current free space of 100MB will never be reached, so all files should be deleted.
+    assert len(os.listdir(buffer_directory)) == 0
+
+
+def test_cleanup_max_files_with_externally_modified_files(database_path: str, buffer_directory: str) -> None:
+    """
+    Ensure that keeping X max files works correctly under the following:
+    - Files may be deleted from disk externally (not via the processor)
+    """
+
+    processor = FileProcessor(
+        buffer_dir=buffer_directory,
+        db_path=database_path,
+        max_files=1,
+        max_attempts=2,
+        process_callback=mock_process_callback,
+        target_free_space_mb=None,
+    )
+
+    def create_and_add_file(name: str) -> str:
+        nonlocal buffer_directory, processor
+        file_path = os.path.join(buffer_directory, name)
+        with open(file_path, 'w') as f:
+            f.write("Test content")
+        processor.add_file_to_db(file_path)
+        return file_path
+
+    file1 = create_and_add_file('success_file_1.txt')
+    file2 = create_and_add_file('success_file_2.txt')
+    create_and_add_file('success_file_3.txt')
+    create_and_add_file('success_file_4.txt')
+
+    # There should be 4 files on disk
+    assert len(os.listdir(buffer_directory)) == 4
+
+    # Manually delete files 1 and 2 to simulate external deletion
+    os.remove(file1)
+    os.remove(file2)
+
+    # Trigger cleanup
+    processor.cleanup_old_files()
+    # THis should have deleted all but one file to maintain max_files=1
+    assert len(os.listdir(buffer_directory)) == 1
+    # It should be the last file added
+    remaining_files = os.listdir(buffer_directory)
+    assert set(remaining_files) == {'success_file_4.txt'}

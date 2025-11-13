@@ -18,6 +18,12 @@ def _default_file_clock(filepath: str) -> float:
     return os.path.getctime(filepath)
 
 
+def _default_free_space_checker(buffer_dir: str) -> float:
+    """Returns the free space in MB on the partition where the buffer directory is located."""
+    _, _, free = shutil.disk_usage(buffer_dir)
+    return free / (1024 * 1024)
+
+
 class FileProcessor:
     """
     System for processing files in a strict order with retry logic.
@@ -30,11 +36,14 @@ class FileProcessor:
     :param process_callback: Callable that processes a file. Should return True if processing is successful
     :param max_attempts: Maximum number of attempts to process a file before marking it as failed.
     :param max_files: Maximum number of files to keep in the buffer directory. If None, no limit is enforced.
-    :param free_space_mb: Optional minimum free space in MB to keep on the partition where the buffer directory is located.
+    :param target_free_space_mb: Optional minimum free space in MB to keep on the partition where the buffer directory is located.
         This is combined with max_files to determine when to delete old files and takes precedence over max_files.
     :param clock: Optional callable that returns the timestamp for the file based on the filename. Takes in the file name as an argument
         and should return a float representing the timestamp in seconds since the epoch. Defaults to datetime.now().timestamp().
         This clock is NOT used when scanning existing files, it takes its own clock function.
+    :param free_space_checker: Optional callable that returns the free space in MB on the partition where the buffer directory is located.
+        Takes in the buffer directory path as an argument and should return a float representing the free space in MB.
+        Defaults to checking the actual free space on the disk.
 
 
     Provides a callback for processing files, which should return True if successful.
@@ -60,16 +69,18 @@ class FileProcessor:
                  process_callback: Callable[[str], bool],
                  max_attempts: int,
                  max_files: Optional[int] = None,
-                 free_space_mb: Optional[float] = None,
-                 clock: Optional[Callable[[str], float]] = None
+                 target_free_space_mb: Optional[float] = None,
+                 clock: Optional[Callable[[str], float]] = None,
+                 free_space_checker: Optional[Callable[[str], float]] = None
                  ) -> None:
         self._buffer_dir = buffer_dir
         self._db_path = db_path
         self._max_files = max_files
         self._max_attempts = max_attempts
         self._process_callback = process_callback
-        self._free_space_mb = free_space_mb
+        self._target_free_space_mb = target_free_space_mb
         self._clock = clock if clock is not None else _default_standard_clock
+        self._free_space_checker = free_space_checker if free_space_checker is not None else _default_free_space_checker
         os.makedirs(self._buffer_dir, exist_ok=True)
         self._init_db()
 
@@ -220,37 +231,39 @@ class FileProcessor:
         conn.close()
 
         for (filepath,) in reversed(files_to_delete):
+            conn = sqlite3.connect(self._db_path)
+            cursor = conn.cursor()
+            cursor.execute(
+                "DELETE FROM file_buffer WHERE filepath = ?", (filepath,))
+            conn.commit()
+            conn.close()
             if os.path.exists(filepath):
                 os.remove(filepath)
-                conn = sqlite3.connect(self._db_path)
-                cursor = conn.cursor()
-                cursor.execute(
-                    "DELETE FROM file_buffer WHERE filepath = ?", (filepath,))
-                conn.commit()
-                conn.close()
                 logger.info(f"Deleted old file {filepath}")
+            else:
+                logger.warning(f"File {filepath} does not exist for deletion.")
 
     def cleanup_old_files(self) -> None:
         """Remove old files based on max_files and free space."""
         if self._max_files is not None:
             self.cleanup_old_files_with_max_files()
 
-        if self._free_space_mb is not None:
+        if self._target_free_space_mb is not None:
             self.cleanup_old_files_with_free_space()
 
     def cleanup_old_files_with_free_space(self) -> None:
         """Remove old files ensuring free space is maintained."""
-        if self._free_space_mb is None:
+        if self._target_free_space_mb is None:
             return
 
-        def free_space_mb() -> float:
-            """Returns the free space in MB on the partition where the buffer directory is located."""
-            _, _, free = shutil.disk_usage(self._buffer_dir)
-            return free / (1024 * 1024)
-
-        while free_space_mb() < self._free_space_mb:
+        count = 0
+        while self._free_space_checker(self._buffer_dir) < self._target_free_space_mb:
             if not self._delete_oldest_file():
                 logger.warning("No more files to delete to free up space.")
+                break
+            count += 1
+            if count > 1000:
+                logger.error("Too many iterations trying to free space, aborting.")
                 break
 
     def _delete_oldest_file(self) -> bool:
@@ -262,23 +275,24 @@ class FileProcessor:
         oldest_file: Optional[tuple[str]] = cursor.fetchone()
         if not oldest_file:
             logger.info("No files to delete.")
+            conn.close()
             return False
 
         filepath = oldest_file[0]
+        cursor.execute(
+            "DELETE FROM file_buffer WHERE filepath = ?", (filepath,))
+        conn.commit()
+        conn.close()
         if os.path.exists(filepath):
             os.remove(filepath)
-            cursor.execute(
-                "DELETE FROM file_buffer WHERE filepath = ?", (filepath,))
-            conn.commit()
             logger.info(f"Deleted oldest file {filepath}")
         else:
             logger.warning(f"Oldest file {filepath} does not exist.")
 
-        conn.close()
         return True
 
     def add_file_to_db(self, filepath: str) -> None:
-        """Adds a new file to database and triggers processing."""
+        """Adds a new file to database to be processed on the next call to process_next_file."""
         timestamp = self._clock(filepath)
         filename: str = os.path.basename(filepath)
         conn = sqlite3.connect(self._db_path)
