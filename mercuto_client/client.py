@@ -17,6 +17,7 @@ from .modules.data import MercutoDataService
 from .modules.fatigue import MercutoFatigueService
 from .modules.identity import MercutoIdentityService
 from .modules.media import MercutoMediaService
+from .modules.reports import MercutoReportService
 
 logger = logging.getLogger(__name__)
 
@@ -191,6 +192,9 @@ class MercutoClient:
 
     def media(self) -> 'MercutoMediaService':
         return self._add_and_fetch_module('media', MercutoMediaService)
+
+    def reports(self) -> 'MercutoReportService':
+        return self._add_and_fetch_module('reports', MercutoReportService)
 
     def login(self, authentication: IAuthenticationMethod) -> None:
         self._auth_method = authentication
