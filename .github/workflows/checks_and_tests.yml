@@ -1,5 +1,11 @@
 name: Linting, static analysis, and tests
-on: push
+on:
+  push:
+    branches:
+      - '**' # all branches
+  pull_request:
+    branches:
+      - main  # on PRs to main
 permissions:
   packages: read # Read packages from GitHub Package Registry
   contents: read  # This is required for actions/checkout

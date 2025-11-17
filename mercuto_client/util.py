@@ -53,7 +53,7 @@ def get_free_space_excluding_files(directory: str) -> int:
     :return: Free bytes available in the partition after subtracting file sizes.
     """
     # Get partition's free space
-    total, used, free = shutil.disk_usage(directory)
+    _, _, free = shutil.disk_usage(directory)
 
     # Calculate the total size of files in the directory
     files_size = get_directory_size(directory)

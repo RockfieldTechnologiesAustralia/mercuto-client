@@ -40,9 +40,9 @@ if __name__ == '__main__':
                         help='Enable verbose output')
     parser.add_argument('-d', '--directory', type=str,
                         help='Directory to store ingested files. Default is a directory called `buffered-files` in the workdir.')
-    parser.add_argument('-s', '--size', type=int,
-                        help='Size in MB for total amount of files to store in the buffer. \
-                            Default is 75% of the available disk space on the buffer partition excluding the directory itself', default=None)
+    parser.add_argument('-s', '--target-free-space-mb', type=int,
+                        help='Size in MB for total amount of remaining free space to keep available. \
+                            Default is 25% of the available disk space on the buffer partition excluding the directory itself', default=None)
     parser.add_argument('--max-files', type=int,
                         help='Maximum number of files to keep in the buffer. Default is to use the size param.', default=None)
     parser.add_argument('--max-attempts', type=int,
@@ -115,10 +115,10 @@ if __name__ == '__main__':
     ftp_dir = os.path.join(workdir, 'temp-ftp-data')
     os.makedirs(ftp_dir, exist_ok=True)
 
-    size = args.size
-    if size is None and args.max_files is None:
-        size = get_free_space_excluding_files(buffer_directory) * 0.75 // (1024 * 1024)  # Convert to MB
-        logging.info(f"Buffer size set to {size} MB based on available disk space.")
+    target_free_space_mb = args.target_free_space_mb
+    if target_free_space_mb is None and args.max_files is None:
+        target_free_space_mb = get_free_space_excluding_files(buffer_directory) * 0.25 // (1024 * 1024)  # Convert to MB
+        logging.info(f"Target remaining free space set to {target_free_space_mb} MB based on available disk space.")
 
     if args.mapping is not None:
         import json
@@ -148,7 +148,7 @@ if __name__ == '__main__':
         db_path=database_path,
         process_callback=ingester.process_file,
         max_attempts=args.max_attempts,
-        free_space_mb=size,
+        target_free_space_mb=target_free_space_mb,
         max_files=args.max_files)
 
     processor.scan_existing_files()

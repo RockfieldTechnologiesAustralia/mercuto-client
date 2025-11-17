@@ -10,6 +10,8 @@ from ..client import MercutoClient
 def mock_mercuto(data: bool = True,
                  identity: bool = True,
                  fatigue: bool = True,
+                 core: bool = True,
+                 media: bool = True,
                  verify_service_token: Optional[Callable[[str], VerifyMyPermissions]] = None) -> Iterator[None]:
     """
     While this context is active, all calls to MercutoClient will use mocked services.
@@ -26,7 +28,32 @@ def mock_mercuto(data: bool = True,
             stack.enter_context(mock_identity_module(verify_service_token=verify_service_token))
         if fatigue:
             stack.enter_context(mock_fatigue_module())
+        if core:
+            stack.enter_context(mock_core_module())
+        if media:
+            stack.enter_context(mock_media_module())
         yield
+
+
+@contextlib.contextmanager
+def mock_core_module() -> Iterator[None]:
+    from .mock_core import MockMercutoCoreService
+    original = MercutoClient.core
+
+    _cache: Optional[MockMercutoCoreService] = None
+
+    def stub(self: MercutoClient) -> MockMercutoCoreService:
+        nonlocal _cache
+        if _cache is None:
+            _cache = MockMercutoCoreService(self)
+        _cache._client = self
+        return _cache
+
+    try:
+        setattr(MercutoClient, 'core', stub)
+        yield
+    finally:
+        setattr(MercutoClient, 'core', original)
 
 
 @contextlib.contextmanager
@@ -90,3 +117,24 @@ def mock_fatigue_module() -> Iterator[None]:
         yield
     finally:
         setattr(MercutoClient, 'fatigue', original)
+
+
+@contextlib.contextmanager
+def mock_media_module() -> Iterator[None]:
+    from .mock_media import MockMercutoMediaService
+    original = MercutoClient.media
+
+    _cache: Optional[MockMercutoMediaService] = None
+
+    def stub(self: MercutoClient) -> MockMercutoMediaService:
+        nonlocal _cache
+        if _cache is None:
+            _cache = MockMercutoMediaService(self)
+        _cache._client = self
+        return _cache
+
+    try:
+        setattr(MercutoClient, 'media', stub)
+        yield
+    finally:
+        setattr(MercutoClient, 'media', original)
