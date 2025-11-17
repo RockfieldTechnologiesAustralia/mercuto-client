@@ -208,43 +208,11 @@ class EventAggregate(BaseModel):
     options: Optional[dict[str, Any]] = None
 
 
-class ScheduledReport(BaseModel):
-    code: str
-    project: str
-    label: str
-    revision: str
-    schedule: Optional[str]
-    contact_group: Optional[str]
-    last_scheduled: Optional[str]
-
-
-class ScheduledReportLog(BaseModel):
-    code: str
-    report: str
-    scheduled_start: Optional[str]
-    actual_start: str
-    actual_finish: Optional[str]
-    status: Literal['IN_PROGRESS', 'COMPLETED', 'FAILED']
-    message: Optional[str]
-    access_url: Optional[str]
-    mime_type: Optional[str]
-    filename: Optional[str]
-
-
-class ReportSourceCodeRevision(BaseModel):
-    code: str
-    revision_date: datetime
-    description: str
-    source_code_url: str
-
-
 _ProjectListAdapter = TypeAdapter(list[Project])
 _EventsListAdapter = TypeAdapter(list[Event])
 _DevicesListAdapter = TypeAdapter(list[Device])
 _DeviceTypeListAdapter = TypeAdapter(list[DeviceType])
 _ContactGroupListAdapter = TypeAdapter(list[ContactGroup])
-_ScheduledReportListAdapter = TypeAdapter(list[ScheduledReport])
-_ScheduledReportLogListAdapter = TypeAdapter(list[ScheduledReportLog])
 
 
 class MercutoCoreService:
@@ -537,55 +505,3 @@ class MercutoCoreService:
                                      'users': users
                                  })
         return ContactGroup.model_validate_json(r.text)
-
-    # Reports
-    def list_reports(self, project: Optional[str] = None) -> list['ScheduledReport']:
-        params: PayloadType = {}
-        if project is not None:
-            params['project'] = project
-        r = self._client.request(
-            '/reports/scheduled', 'GET', params=params)
-        return _ScheduledReportListAdapter.validate_json(r.text)
-
-    def create_report(self, project: str, label: str, schedule: str, revision: str,
-                      api_key: Optional[str] = None, contact_group: Optional[str] = None) -> ScheduledReport:
-        json: PayloadType = {
-            'project': project,
-            'label': label,
-            'schedule': schedule,
-            'revision': revision,
-            'execution_role_api_key': api_key,
-            'contact_group': contact_group
-        }
-        r = self._client.request('/reports/scheduled', 'PUT', json=json)
-        return ScheduledReport.model_validate_json(r.text)
-
-    def generate_report(self, report: str, timestamp: datetime, mark_as_scheduled: bool = False) -> ScheduledReportLog:
-        r = self._client.request(f'/reports/scheduled/{report}/generate', 'PUT', json={
-            'timestamp': timestamp.isoformat(),
-            'mark_as_scheduled': mark_as_scheduled
-        })
-        return ScheduledReportLog.model_validate_json(r.text)
-
-    def list_report_logs(self, report: str, project: Optional[str] = None) -> list[ScheduledReportLog]:
-        params: PayloadType = {}
-        if project is not None:
-            params['project'] = project
-        r = self._client.request(
-            f'/reports/scheduled/{report}/logs', 'GET', params=params)
-        return _ScheduledReportLogListAdapter.validate_json(r.text)
-
-    def get_report_log(self, report: str, log: str) -> ScheduledReportLog:
-        r = self._client.request(
-            f'/reports/scheduled/{report}/logs/{log}', 'GET')
-        return ScheduledReportLog.model_validate_json(r.text)
-
-    def create_report_revision(self, project: str, revision_date: datetime, description: str, source_code_data_url: str) -> ReportSourceCodeRevision:
-        json = {
-            'revision_date': revision_date.isoformat(),
-            'description': description,
-            'source_code_data_url': source_code_data_url,
-        }
-        r = self._client.request(
-            '/reports/revisions', 'PUT', json=json, params={'project': project})
-        return ReportSourceCodeRevision.model_validate_json(r.text)
