@@ -201,6 +201,14 @@ class Device(BaseModel):
     channels: list[DeviceChannel]
 
 
+class DeviceGroup(BaseModel):
+    code: str
+    project: ItemCode
+    label: str
+    description: str
+    group_label: Optional[str] = None
+
+
 class EventAggregate(BaseModel):
     aggregate: Literal["max", "greatest", "min", "median",
                        "abs-max", "mean", "rms", "peak-to-peak", "daf"]
@@ -379,21 +387,6 @@ class MercutoCoreService:
         start_time: datetime,
         end_time: datetime,
     ) -> EventStatisticsOut:
-        params: _PayloadType = {
-            'project_code': project_code,
-            'start_time': start_time.isoformat(),
-            'end_time': end_time.isoformat(),
-        }
-
-        r = self._client._http_request('/events/statistics', 'GET', params=params)
-        return EventStatisticsOut.model_validate_json(r.text)
-
-    def get_event_statistics(
-        self,
-        project_code: str,
-        start_time: datetime,
-        end_time: datetime,
-    ) -> EventStatisticsOut:
         params: PayloadType = {
             'project_code': project_code,
             'start_time': start_time.isoformat(),
@@ -410,7 +403,7 @@ class MercutoCoreService:
 
     # ALERTS
     def get_conditions(self, project: str, limit: int = 100, offset: int = 0) -> list[Condition]:
-        params: _PayloadType = {
+        params: PayloadType = {
             'project': project,
             'limit': limit,
             'offset': offset
@@ -537,6 +530,10 @@ class MercutoCoreService:
             json['channels'] = [channel.model_dump(mode='json') for channel in channels]  # type: ignore[assignment]
         r = self._client.request('/devices', 'PUT', json=json)
         return Device.model_validate_json(r.text)
+
+    def get_available_groups(self, project_code: str) -> list[DeviceGroup]:
+        r = self._client.request('/devices/groups', 'GET', params={'project_code': project_code})
+        return [DeviceGroup.model_validate(item) for item in r.json()]
 
     # Contacts
 
