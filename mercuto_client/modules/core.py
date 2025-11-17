@@ -344,7 +344,7 @@ class MercutoCoreService:
         project_code: str,
         start_time: datetime,
         end_time: datetime,
-    ) -> list[EventStatisticsOut]:
+    ) -> EventStatisticsOut:
         params: _PayloadType = {
             'project_code': project_code,
             'start_time': start_time.isoformat(),
@@ -375,6 +375,16 @@ class MercutoCoreService:
                              params={'project_code': project})
 
     # ALERTS
+    def get_conditions(self, project: str, limit: int = 100, offset: int = 0) -> list[Condition]:
+        params: _PayloadType = {
+            'project': project,
+            'limit': limit,
+            'offset': offset
+        }
+        r = self._client._http_request('/alerts/conditions', 'GET', params=params)
+
+        return [Condition.model_validate(item) for item in r.json()]
+
 
     def get_condition(self, code: str) -> Condition:
         r = self._client.request(f'/alerts/conditions/{code}', 'GET')
