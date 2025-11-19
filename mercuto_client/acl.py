@@ -20,6 +20,13 @@ class ResourceTypes:
         TENANT = 'tenant'
         WILDCARD = '*'
 
+    class Notifications:
+        """
+        Resource types available for ServiceTypes.NOTIFICATIONS
+        """
+        CONTACT_GROUP = 'contact-group'
+        WILDCARD = '*'
+
 
 class AllowedActions:
     WILDCARD = '*'
@@ -46,6 +53,13 @@ class AllowedActions:
         VIEW_USER_DETAILED_INFO = 'IDENTITY:VIEW_USER_DETAILED_INFO'
         CREATE_NEW_TENANTS = 'IDENTITY:CREATE_NEW_TENANTS'
 
+    class Notifications:
+        """
+        Actions available for ServiceTypes.NOTIFICATIONS
+        """
+        WILDCARD = '*'
+        ISSUE_NOTIFICATION = 'NOTIFICATIONS:ISSUE_NOTIFICATION'
+
 
 class ServiceTypes:
     class Mercuto:
@@ -58,8 +72,14 @@ class ServiceTypes:
         ResourceTypes = ResourceTypes.Identity
         AllowedActions = AllowedActions.Identity
 
+    class Notifications:
+        Name = 'notifications'
+        ResourceTypes = ResourceTypes.Notifications
+        AllowedActions = AllowedActions.Notifications
+
     IDENTITY = Identity.Name
     MERCUTO = Mercuto.Name
+    NOTIFICATIONS = Notifications.Name
     WILDCARD = '*'
 
 
