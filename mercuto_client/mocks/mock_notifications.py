@@ -3,6 +3,8 @@ import uuid
 from datetime import datetime, timezone
 from typing import Optional
 
+from pydantic import BaseModel
+
 from ..client import MercutoClient
 from ..exceptions import MercutoHTTPException
 from ..modules.notifications import (ContactGroup, ContactMethod,
@@ -13,7 +15,7 @@ from ._utility import EnforceOverridesMeta
 logger = logging.getLogger(__name__)
 
 
-class IssuedNotification:
+class IssuedNotification(BaseModel):
     contact_group: ContactGroup
     subject: str
     html: str
