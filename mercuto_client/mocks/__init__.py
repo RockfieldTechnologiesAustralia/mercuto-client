@@ -12,6 +12,7 @@ def mock_mercuto(data: bool = True,
                  fatigue: bool = True,
                  core: bool = True,
                  media: bool = True,
+                 notifications: bool = True,
                  verify_service_token: Optional[Callable[[str], VerifyMyPermissions]] = None) -> Iterator[None]:
     """
     While this context is active, all calls to MercutoClient will use mocked services.
@@ -25,13 +26,16 @@ def mock_mercuto(data: bool = True,
         if data:
             stack.enter_context(mock_data_module())
         if identity:
-            stack.enter_context(mock_identity_module(verify_service_token=verify_service_token))
+            stack.enter_context(mock_identity_module(
+                verify_service_token=verify_service_token))
         if fatigue:
             stack.enter_context(mock_fatigue_module())
         if core:
             stack.enter_context(mock_core_module())
         if media:
             stack.enter_context(mock_media_module())
+        if notifications:
+            stack.enter_context(mock_notifications_module())
         yield
 
 
@@ -87,7 +91,8 @@ def mock_identity_module(verify_service_token: Optional[Callable[[str], VerifyMy
     def stub(self: MercutoClient) -> MockMercutoIdentityService:
         nonlocal _cache
         if _cache is None:
-            _cache = MockMercutoIdentityService(self, verify_service_token=verify_service_token)
+            _cache = MockMercutoIdentityService(
+                self, verify_service_token=verify_service_token)
         _cache._client = self
         return _cache
 
@@ -138,3 +143,24 @@ def mock_media_module() -> Iterator[None]:
         yield
     finally:
         setattr(MercutoClient, 'media', original)
+
+
+@contextlib.contextmanager
+def mock_notifications_module() -> Iterator[None]:
+    from .mock_notifications import MockMercutoNotificationService
+    original = MercutoClient.notifications
+
+    _cache: Optional[MockMercutoNotificationService] = None
+
+    def stub(self: MercutoClient) -> MockMercutoNotificationService:
+        nonlocal _cache
+        if _cache is None:
+            _cache = MockMercutoNotificationService(self)
+        _cache._client = self
+        return _cache
+
+    try:
+        setattr(MercutoClient, 'notifications', stub)
+        yield
+    finally:
+        setattr(MercutoClient, 'notifications', original)

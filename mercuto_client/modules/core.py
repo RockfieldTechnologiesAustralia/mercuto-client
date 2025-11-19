@@ -107,16 +107,6 @@ class EventStatisticsOut(BaseModel):
     last_event: Optional[Event] = None
 
 
-UserContactMethod = Literal['EMAIL', 'SMS']
-
-
-class ContactGroup(BaseModel):
-    project: str
-    code: str
-    label: str
-    users: dict[str, list[UserContactMethod]]
-
-
 class Condition(BaseModel):
     code: str
     source: str
@@ -131,7 +121,7 @@ class AlertConfiguration(BaseModel):
     project: str
     label: str
     conditions: list[Condition]
-    contact_group: Optional[ContactGroup]
+    contact_group: Optional[str]
     retrigger_interval: Optional[datetime]
 
 
@@ -212,7 +202,6 @@ _ProjectListAdapter = TypeAdapter(list[Project])
 _EventsListAdapter = TypeAdapter(list[Event])
 _DevicesListAdapter = TypeAdapter(list[Device])
 _DeviceTypeListAdapter = TypeAdapter(list[DeviceType])
-_ContactGroupListAdapter = TypeAdapter(list[ContactGroup])
 
 
 class MercutoCoreService:
@@ -481,27 +470,3 @@ class MercutoCoreService:
             json['channels'] = [channel.model_dump(mode='json') for channel in channels]  # type: ignore[assignment]
         r = self._client.request('/devices', 'PUT', json=json)
         return Device.model_validate_json(r.text)
-
-    # Contacts
-
-    def list_contact_groups(self, project: Optional[str] = None) -> list[ContactGroup]:
-        params: PayloadType = {}
-        if project is not None:
-            params['project'] = project
-        r = self._client.request(
-            '/notifications/contact_groups', 'GET', params=params)
-        return _ContactGroupListAdapter.validate_json(r.text)
-
-    def get_contact_group(self, code: str) -> ContactGroup:
-        r = self._client.request(
-            f'/notifications/contact_groups/{code}', 'GET')
-        return ContactGroup.model_validate_json(r.text)
-
-    def create_contact_group(self, project: str, label: str, users: dict[str, list[UserContactMethod]]) -> ContactGroup:
-        r = self._client.request('/notifications/contact_groups', 'PUT',
-                                 json={
-                                     'project': project,
-                                     'label': label,
-                                     'users': users
-                                 })
-        return ContactGroup.model_validate_json(r.text)
