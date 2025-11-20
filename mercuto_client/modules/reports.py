@@ -1,8 +1,10 @@
 from datetime import datetime
-from typing import TYPE_CHECKING, Literal, Optional, Protocol, TypedDict
+from typing import (TYPE_CHECKING, BinaryIO, Literal, Optional, Protocol,
+                    TypedDict)
 
-from pydantic import TypeAdapter
+from pydantic import AwareDatetime, TypeAdapter
 
+from ..exceptions import MercutoHTTPException
 from . import PayloadType
 from ._util import BaseModel
 
@@ -10,23 +12,27 @@ if TYPE_CHECKING:
     from ..client import MercutoClient
 
 
-class ScheduledReport(BaseModel):
+class ReportConfiguration(BaseModel):
     code: str
     project: str
     label: str
     revision: str
-    schedule: Optional[str]
-    contact_group: Optional[str]
-    last_scheduled: Optional[str]
+    schedule: Optional[str] = None
+    contact_group: Optional[str] = None
+    last_scheduled: Optional[AwareDatetime] = None
+    custom_policy: Optional[str] = None
 
 
-class ScheduledReportLog(BaseModel):
+ReportLogStatus = Literal['PENDING', 'IN_PROGRESS', 'COMPLETED', 'FAILED']
+
+
+class ReportLog(BaseModel):
     code: str
-    report: str
-    scheduled_start: Optional[str]
-    actual_start: str
-    actual_finish: Optional[str]
-    status: Literal['IN_PROGRESS', 'COMPLETED', 'FAILED']
+    report_configuration: str
+    scheduled_start: Optional[AwareDatetime]
+    actual_start: AwareDatetime
+    actual_finish: Optional[AwareDatetime]
+    status: ReportLogStatus
     message: Optional[str]
     access_url: Optional[str]
     mime_type: Optional[str]
@@ -35,13 +41,18 @@ class ScheduledReportLog(BaseModel):
 
 class ReportSourceCodeRevision(BaseModel):
     code: str
-    revision_date: datetime
+    project: Optional[str]
+    revision_date: AwareDatetime
     description: str
     source_code_url: str
 
 
-_ScheduledReportListAdapter = TypeAdapter(list[ScheduledReport])
-_ScheduledReportLogListAdapter = TypeAdapter(list[ScheduledReportLog])
+class Healthcheck(BaseModel):
+    status: str
+
+
+_ReportConfigurationListAdapter = TypeAdapter(list[ReportConfiguration])
+_ReportLogListAdapter = TypeAdapter(list[ReportLog])
 
 """
 The below types are used for defining report generation functions.
@@ -68,7 +79,6 @@ class HandlerRequest(TypedDict):
 class HandlerContext(TypedDict):
     service_token: str
     project_code: str
-    tenant_code: str
     report_code: str
     log_code: str
     client: 'MercutoClient'
@@ -82,22 +92,27 @@ class ReportHandler(Protocol):
 
 
 class MercutoReportService:
-    def __init__(self, client: 'MercutoClient') -> None:
+    def __init__(self, client: 'MercutoClient', path: str = '/reports') -> None:
         self._client = client
+        self._path = path
 
-    def list_reports(self, project: Optional[str] = None) -> list['ScheduledReport']:
+    def healthcheck(self) -> Healthcheck:
+        r = self._client.request(f"{self._path}/healthcheck", "GET")
+        return Healthcheck.model_validate_json(r.text)
+
+    def list_report_configurations(self, project: str) -> list['ReportConfiguration']:
         """
-        List scheduled reports, optionally filtered by project.
+        List scheduled reports for a specific project.
         """
-        params: PayloadType = {}
-        if project is not None:
-            params['project'] = project
+        params: PayloadType = {
+            'project': project
+        }
         r = self._client.request(
-            '/reports/scheduled', 'GET', params=params)
-        return _ScheduledReportListAdapter.validate_json(r.text)
+            f'{self._path}/configurations', 'GET', params=params)
+        return _ReportConfigurationListAdapter.validate_json(r.text)
 
-    def create_report(self, project: str, label: str, schedule: str, revision: str,
-                      contact_group: Optional[str] = None) -> ScheduledReport:
+    def create_report_configuration(self, project: str, label: str, schedule: str, revision: str,
+                                    contact_group: Optional[str] = None, custom_policy: Optional[str] = None) -> ReportConfiguration:
         """
         Create a new scheduled report using the provided source code revision.
         """
@@ -106,42 +121,50 @@ class MercutoReportService:
             'label': label,
             'schedule': schedule,
             'revision': revision,
-            'contact_group': contact_group
         }
-        r = self._client.request('/reports/scheduled', 'PUT', json=json)
-        return ScheduledReport.model_validate_json(r.text)
+        if contact_group is not None:
+            json['contact_group'] = contact_group
+        if custom_policy is not None:
+            json['custom_policy'] = custom_policy
+        r = self._client.request(
+            f'{self._path}/configurations', 'PUT', json=json)
+        return ReportConfiguration.model_validate_json(r.text)
 
-    def generate_report(self, report: str, timestamp: datetime, mark_as_scheduled: bool = False) -> ScheduledReportLog:
+    def generate_report(self, report: str, timestamp: datetime, mark_as_scheduled: bool = False) -> ReportLog:
         """
         Trigger generation of a scheduled report for a specific timestamp.
         """
-        r = self._client.request(f'/reports/scheduled/{report}/generate', 'PUT', json={
+        r = self._client.request(f'{self._path}/configurations/{report}/generate', 'POST', json={
             'timestamp': timestamp.isoformat(),
             'mark_as_scheduled': mark_as_scheduled
         })
-        return ScheduledReportLog.model_validate_json(r.text)
+        return ReportLog.model_validate_json(r.text)
 
-    def list_report_logs(self, report: str, project: Optional[str] = None) -> list[ScheduledReportLog]:
+    def list_report_logs(self, project: str, report: Optional[str] = None) -> list[ReportLog]:
         """
-        List report log entries for a specific report.
+        List report log entries for a specific project.
         """
-        params: PayloadType = {}
-        if project is not None:
-            params['project'] = project
+        params: PayloadType = {
+            'project': project
+        }
+        if report is not None:
+            params['configuration'] = report
         r = self._client.request(
-            f'/reports/scheduled/{report}/logs', 'GET', params=params)
-        return _ScheduledReportLogListAdapter.validate_json(r.text)
+            f'{self._path}/logs', 'GET', params=params)
+        return _ReportLogListAdapter.validate_json(r.text)
 
-    def get_report_log(self, report: str, log: str) -> ScheduledReportLog:
+    def get_report_log(self, log: str) -> ReportLog:
         """
         Get a specific report log entry.
         """
         r = self._client.request(
-            f'/reports/scheduled/{report}/logs/{log}', 'GET')
-        return ScheduledReportLog.model_validate_json(r.text)
+            f'{self._path}/logs/{log}', 'GET')
+        return ReportLog.model_validate_json(r.text)
 
-    def create_report_revision(self, project: str, revision_date: datetime,
-                               description: str, source_code_data_url: str) -> ReportSourceCodeRevision:
+    def create_report_revision(self, revision_date: datetime,
+                               description: str,
+                               project: Optional[str],
+                               source_code: BinaryIO) -> ReportSourceCodeRevision:
         """
         Create a new report source code revision.
 
@@ -172,14 +195,28 @@ class MercutoReportService:
             project (str): The project code.
             revision_date (datetime): The date of the revision.
             description (str): A description of the revision.
-            source_code_data_url (str): A presigned URL to the report source code file, either a .py file or a .zip package.
+            source_code (io.BinaryIO): The report source code file, either a .py file or a .zip package.
 
         """
-        json = {
+        # Create the revision metadata
+        json: PayloadType = {
             'revision_date': revision_date.isoformat(),
             'description': description,
-            'source_code_data_url': source_code_data_url,
         }
+        if project is not None:
+            json['project'] = project
+        r = self._client.request(f'{self._path}/revisions', 'PUT', json=json)
+        revision = ReportSourceCodeRevision.model_validate_json(r.text)
+
+        # Upload the source code
         r = self._client.request(
-            '/reports/revisions', 'PUT', json=json, params={'project': project})
-        return ReportSourceCodeRevision.model_validate_json(r.text)
+            f'{self._path}/revisions/{revision.code}', 'PATCH')
+        upload_url = r.json()['target_source_code_url']
+        upload_url = self._client.session().put(upload_url,
+                                                data=source_code, verify=self._client.verify_ssl)
+        if not upload_url.ok:
+            raise MercutoHTTPException(
+                f"Failed to upload report source code: {upload_url.status_code} {upload_url.text}",
+                upload_url.status_code
+            )
+        return revision

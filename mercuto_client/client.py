@@ -40,7 +40,7 @@ class MercutoClient:
         if url.endswith('/'):
             url = url[:-1]
 
-        if not url.startswith('https://'):
+        if verify_ssl and not url.startswith('https://'):
             raise ValueError(f'Url must be https, is {url}')
 
         self._url = url

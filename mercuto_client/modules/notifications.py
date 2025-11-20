@@ -78,7 +78,7 @@ class MercutoNotificationService:
         :return: None
         """
 
-        self._client.request(f"{self._path}/contact-groups/{contact_group}/issue", "POST", json={
+        self._client.request(f"{self._path}/contact-groups/{contact_group}/notify", "POST", json={
             "subject": subject,
             "html": html,
             "alternative_plaintext": alternative_plaintext,
