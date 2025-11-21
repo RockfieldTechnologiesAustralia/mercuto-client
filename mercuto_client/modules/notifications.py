@@ -43,8 +43,8 @@ class MercutoNotificationService:
         r = self._client.request(f"{self._path}/healthcheck", "GET")
         return Healthcheck.model_validate_json(r.text)
 
-    def list_contact_groups(self) -> list[ContactGroup]:
-        r = self._client.request(f"{self._path}/contact-groups", "GET")
+    def list_contact_groups(self, project: str) -> list[ContactGroup]:
+        r = self._client.request(f"{self._path}/contact-groups", "GET", params={"project": project})
         return _ContactGroupListAdapter.validate_json(r.text)
 
     def get_contact_group(self, code: str) -> ContactGroup:

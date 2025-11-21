@@ -106,6 +106,7 @@ class EventStatisticsOut(BaseModel):
     n_events_in_range: int
     last_event: Optional[Event] = None
 
+
 UserContactMethod = Literal['EMAIL', 'SMS']
 
 
@@ -219,6 +220,8 @@ _ProjectListAdapter = TypeAdapter(list[Project])
 _EventsListAdapter = TypeAdapter(list[Event])
 _DevicesListAdapter = TypeAdapter(list[Device])
 _DeviceTypeListAdapter = TypeAdapter(list[DeviceType])
+_DeviceGroupListAdapter = TypeAdapter(list[DeviceGroup])
+_ConditionListAdapter = TypeAdapter(list[Condition])
 
 
 class MercutoCoreService:
@@ -346,7 +349,7 @@ class MercutoCoreService:
 
         r = self._client.request('/events/nearest', 'GET', params=params)
         return Event.model_validate_json(r.text)
-    
+
     def get_event_statistics(
         self,
         project_code: str,
@@ -368,16 +371,14 @@ class MercutoCoreService:
                              params={'project_code': project})
 
     # ALERTS
-    def get_conditions(self, project: str, limit: int = 100, offset: int = 0) -> list[Condition]:
+    def list_conditions(self, project: str, limit: int = 100, offset: int = 0) -> list[Condition]:
         params: PayloadType = {
             'project': project,
             'limit': limit,
             'offset': offset
         }
-        r = self._client._http_request('/alerts/conditions', 'GET', params=params)
-
-        return [Condition.model_validate(item) for item in r.json()]
-
+        r = self._client.request('/alerts/conditions', 'GET', params=params)
+        return _ConditionListAdapter.validate_json(r.text)
 
     def get_condition(self, code: str) -> Condition:
         r = self._client.request(f'/alerts/conditions/{code}', 'GET')
@@ -498,82 +499,6 @@ class MercutoCoreService:
         r = self._client.request('/devices', 'PUT', json=json)
         return Device.model_validate_json(r.text)
 
-    def get_available_groups(self, project_code: str) -> list[DeviceGroup]:
-        r = self._client.request('/devices/groups', 'GET', params={'project_code': project_code})
-        return [DeviceGroup.model_validate(item) for item in r.json()]
-
-    # Contacts
-
-    def list_contact_groups(self, project: Optional[str] = None) -> list[ContactGroup]:
-        params: PayloadType = {}
-        if project is not None:
-            params['project'] = project
-        r = self._client.request(
-            '/notifications/contact_groups', 'GET', params=params)
-        return _ContactGroupListAdapter.validate_json(r.text)
-
-    def get_contact_group(self, code: str) -> ContactGroup:
-        r = self._client.request(
-            f'/notifications/contact_groups/{code}', 'GET')
-        return ContactGroup.model_validate_json(r.text)
-
-    def create_contact_group(self, project: str, label: str, users: dict[str, list[UserContactMethod]]) -> ContactGroup:
-        r = self._client.request('/notifications/contact_groups', 'PUT',
-                                 json={
-                                     'project': project,
-                                     'label': label,
-                                     'users': users
-                                 })
-        return ContactGroup.model_validate_json(r.text)
-
-    # Reports
-    def list_reports(self, project: Optional[str] = None) -> list['ScheduledReport']:
-        params: PayloadType = {}
-        if project is not None:
-            params['project'] = project
-        r = self._client.request(
-            '/reports/scheduled', 'GET', params=params)
-        return _ScheduledReportListAdapter.validate_json(r.text)
-
-    def create_report(self, project: str, label: str, schedule: str, revision: str,
-                      api_key: Optional[str] = None, contact_group: Optional[str] = None) -> ScheduledReport:
-        json: PayloadType = {
-            'project': project,
-            'label': label,
-            'schedule': schedule,
-            'revision': revision,
-            'execution_role_api_key': api_key,
-            'contact_group': contact_group
-        }
-        r = self._client.request('/reports/scheduled', 'PUT', json=json)
-        return ScheduledReport.model_validate_json(r.text)
-
-    def generate_report(self, report: str, timestamp: datetime, mark_as_scheduled: bool = False) -> ScheduledReportLog:
-        r = self._client.request(f'/reports/scheduled/{report}/generate', 'PUT', json={
-            'timestamp': timestamp.isoformat(),
-            'mark_as_scheduled': mark_as_scheduled
-        })
-        return ScheduledReportLog.model_validate_json(r.text)
-
-    def list_report_logs(self, report: str, project: Optional[str] = None) -> list[ScheduledReportLog]:
-        params: PayloadType = {}
-        if project is not None:
-            params['project'] = project
-        r = self._client.request(
-            f'/reports/scheduled/{report}/logs', 'GET', params=params)
-        return _ScheduledReportLogListAdapter.validate_json(r.text)
-
-    def get_report_log(self, report: str, log: str) -> ScheduledReportLog:
-        r = self._client.request(
-            f'/reports/scheduled/{report}/logs/{log}', 'GET')
-        return ScheduledReportLog.model_validate_json(r.text)
-
-    def create_report_revision(self, project: str, revision_date: datetime, description: str, source_code_data_url: str) -> ReportSourceCodeRevision:
-        json = {
-            'revision_date': revision_date.isoformat(),
-            'description': description,
-            'source_code_data_url': source_code_data_url,
-        }
-        r = self._client.request(
-            '/reports/revisions', 'PUT', json=json, params={'project': project})
-        return ReportSourceCodeRevision.model_validate_json(r.text)
+    def list_device_groups(self, project: str) -> list[DeviceGroup]:
+        r = self._client.request('/devices/groups', 'GET', params={'project_code': project})
+        return _DeviceGroupListAdapter.validate_json(r.text)
