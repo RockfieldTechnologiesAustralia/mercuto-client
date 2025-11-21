@@ -107,6 +107,16 @@ class EventStatisticsOut(BaseModel):
     last_event: Optional[Event] = None
 
 
+UserContactMethod = Literal['EMAIL', 'SMS']
+
+
+class ContactGroup(BaseModel):
+    project: str
+    code: str
+    label: str
+    users: dict[str, list[UserContactMethod]]
+
+
 class Condition(BaseModel):
     code: str
     source: str
@@ -191,6 +201,14 @@ class Device(BaseModel):
     channels: list[DeviceChannel]
 
 
+class DeviceGroup(BaseModel):
+    code: str
+    project: ItemCode
+    label: str
+    description: str
+    group_label: Optional[str] = None
+
+
 class EventAggregate(BaseModel):
     aggregate: Literal["max", "greatest", "min", "median",
                        "abs-max", "mean", "rms", "peak-to-peak", "daf"]
@@ -202,6 +220,8 @@ _ProjectListAdapter = TypeAdapter(list[Project])
 _EventsListAdapter = TypeAdapter(list[Event])
 _DevicesListAdapter = TypeAdapter(list[Device])
 _DeviceTypeListAdapter = TypeAdapter(list[DeviceType])
+_DeviceGroupListAdapter = TypeAdapter(list[DeviceGroup])
+_ConditionListAdapter = TypeAdapter(list[Condition])
 
 
 class MercutoCoreService:
@@ -351,6 +371,14 @@ class MercutoCoreService:
                              params={'project_code': project})
 
     # ALERTS
+    def list_conditions(self, project: str, limit: int = 100, offset: int = 0) -> list[Condition]:
+        params: PayloadType = {
+            'project': project,
+            'limit': limit,
+            'offset': offset
+        }
+        r = self._client.request('/alerts/conditions', 'GET', params=params)
+        return _ConditionListAdapter.validate_json(r.text)
 
     def get_condition(self, code: str) -> Condition:
         r = self._client.request(f'/alerts/conditions/{code}', 'GET')
@@ -470,3 +498,7 @@ class MercutoCoreService:
             json['channels'] = [channel.model_dump(mode='json') for channel in channels]  # type: ignore[assignment]
         r = self._client.request('/devices', 'PUT', json=json)
         return Device.model_validate_json(r.text)
+
+    def list_device_groups(self, project: str) -> list[DeviceGroup]:
+        r = self._client.request('/devices/groups', 'GET', params={'project_code': project})
+        return _DeviceGroupListAdapter.validate_json(r.text)

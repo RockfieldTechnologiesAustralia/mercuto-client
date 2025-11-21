@@ -32,8 +32,8 @@ class MockMercutoNotificationService(MercutoNotificationService, metaclass=Enfor
         self.contact_groups: dict[str, ContactGroup] = {}
         self.issued_notifications: list[IssuedNotification] = []
 
-    def list_contact_groups(self) -> list[ContactGroup]:
-        return list(self.contact_groups.values())
+    def list_contact_groups(self, project: str) -> list[ContactGroup]:
+        return [group for group in self.contact_groups.values() if group.project == project]
 
     def get_contact_group(self, code: str) -> ContactGroup:
         if code not in self.contact_groups:
