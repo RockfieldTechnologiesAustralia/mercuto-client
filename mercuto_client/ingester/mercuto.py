@@ -3,6 +3,8 @@ import logging
 import os
 from typing import Optional
 
+import pytz
+
 from .. import MercutoClient, MercutoHTTPException
 from ..modules.core import Project
 from ..modules.data import (Channel, ChannelClassification, Datatable,
@@ -16,10 +18,20 @@ NON_RETRYABLE_ERRORS = {400, 404, 409}  # HTTP status codes that indicate non-re
 
 
 class MercutoIngester:
-    def __init__(self, project_code: str, api_key: str, hostname: str = 'https://api.rockfieldcloud.com.au') -> None:
+    def __init__(self, project_code: str, api_key: str,
+                 hostname: str = 'https://api.rockfieldcloud.com.au',
+                 timezone: Optional[str] = None) -> None:
+        """
+        :param project_code: The Mercuto project code to ingest data into.
+        :param api_key: The API key to use for authentication.
+        :param hostname: The Mercuto server hostname.
+        :param timezone: The timezone to use for data uploads as a string (e.g. 'Australia/Melbourne').
+        """
         self._client = MercutoClient(url=hostname)
         self._api_key = api_key
         self._project_code = project_code
+        self._timezone = timezone
+        self._timezone_tzinfo = pytz.timezone(timezone) if timezone else None
 
         self._project: Optional[Project] = None
         self._secondary_channels: Optional[list[Channel]] = None
@@ -118,6 +130,7 @@ class MercutoIngester:
                     project=self.project_code,
                     datatable=datatable_code,
                     file=file_path,
+                    timezone=self._timezone
                 )
             return True
         except MercutoHTTPException as e:
@@ -147,7 +160,7 @@ class MercutoIngester:
             return self._upload_file(file_path, datatable_code)
         else:
             parser = detect_parser(file_path)
-            samples = parser(file_path, self._channel_map)
+            samples = parser(file_path, self._channel_map, timezone=self._timezone_tzinfo)
             if not samples:
                 logging.warning(f"No samples found in file: {file_path}")
                 return True

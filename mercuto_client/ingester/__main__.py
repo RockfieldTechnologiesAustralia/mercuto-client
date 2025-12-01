@@ -75,6 +75,11 @@ if __name__ == '__main__':
     parser.add_argument('--no-rename', action='store_true',
                         help='Add the current timestamp to the end of the files received via FTP. \
                         This is useful to avoid overwriting files with the same name.')
+    parser.add_argument('--timezone', type=str,
+                        help='Timezone to use for data uploads (e.g. "Australia/Melbourne"). \
+                        If not provided, no timezone will be sent on uploads. \
+                        Only needed if data files do not contain timezone information (E.g. Campbell Scientific loggers).',
+                        default=None)
 
     args = parser.parse_args()
 
@@ -139,7 +144,9 @@ if __name__ == '__main__':
     ingester = MercutoIngester(
         project_code=args.project,
         api_key=args.api_key,
-        hostname=args.hostname)
+        hostname=args.hostname,
+        timezone=args.timezone
+    )
 
     ingester.update_mapping(mapping)
 
