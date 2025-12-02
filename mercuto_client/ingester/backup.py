@@ -150,8 +150,8 @@ class CSCPBackup(IBackupHandler):
         try:
             logger.debug(f'Copy Command: {" ".join(command)}')
             result = subprocess.run(command, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            logger.debug(f"STDOUT: {result.stdout.decode("utf-8", errors='ignore')}")
-            logger.debug(f"STDERR: {result.stderr.decode("utf-8", errors='ignore')}")
+            logger.debug(f"STDOUT: {result.stdout.decode('utf-8', errors='ignore')}")
+            logger.debug(f"STDERR: {result.stderr.decode('utf-8', errors='ignore')}")
             return result.returncode == 0
 
         except subprocess.CalledProcessError as e:
