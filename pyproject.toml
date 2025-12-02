@@ -9,6 +9,7 @@ dependencies = [
     "python-dateutil>=2.9.0.post0",
     "pytz>=2025.2",
     "schedule>=1.2.2",
+    'zc.lockfile>=4.0',
     'pydantic>=2.0'
 ]
 version = "0.0.0"  # This will be replaced by the workflow
@@ -41,6 +42,9 @@ tests = [
     "mypy>=1.16.1",
     "isort>=6.0.1",
     "pandas>=2.3.2",
+    "httpx>=0.28.1",
+    "fastapi>=0.118.0",
+    "python-multipart>=0.0.20",
 ]
 
 [build-system]
@@ -52,3 +56,7 @@ mercuto_client = ["py.typed"]
 
 [tool.mypy]
 strict = false
+
+[project.scripts]
+mc-ftp-ingester = "mercuto_client.ingester.__main__:main"
+mc-pid-check = "mercuto_client.ingester.pid_file:main"

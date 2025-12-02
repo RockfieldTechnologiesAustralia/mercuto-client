@@ -20,14 +20,16 @@ NON_RETRYABLE_ERRORS = {400, 404, 409}  # HTTP status codes that indicate non-re
 class MercutoIngester:
     def __init__(self, project_code: str, api_key: str,
                  hostname: str = 'https://api.rockfieldcloud.com.au',
+                 verify_ssl: bool = True,
                  timezone: Optional[str] = None) -> None:
         """
         :param project_code: The Mercuto project code to ingest data into.
         :param api_key: The API key to use for authentication.
         :param hostname: The Mercuto server hostname.
+        :param verify_ssl: Verify SSL certificates for the target server when using https. Default True.
         :param timezone: The timezone to use for data uploads as a string (e.g. 'Australia/Melbourne').
         """
-        self._client = MercutoClient(url=hostname)
+        self._client = MercutoClient(url=hostname, verify_ssl=verify_ssl)
         self._api_key = api_key
         self._project_code = project_code
         self._timezone = timezone
