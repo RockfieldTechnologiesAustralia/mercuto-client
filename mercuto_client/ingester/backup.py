@@ -70,7 +70,8 @@ class CSCPBackup(IBackupHandler):
     - private_key: Path to the private key file for authentication.
     - script: A script to run on the remote server after file transfer. The script can use
       the placeholder '{destination}' to refer to the path of the transferred file.
-    - disable_strict_checking: If set to 'yes', disables strict checking of host keys, known_hosts file is not used, and user private keys can be open.
+    - disable_strict_checking: If set to 'yes', disables strict checking of host keys, known_hosts file is not used,
+        and user private keys can be open.
         It adds the following options to the scp/ssh command: oStrictHostKeyChecking=no, oUserKnownHostsFile=/dev/null
     """
     @dataclass
@@ -203,8 +204,8 @@ class CSCPBackup(IBackupHandler):
         try:
             logger.debug(f'Script Command: {" ".join(command)}')
             result = subprocess.run(command, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            logger.debug(f"STDOUT: {result.stdout.decode("utf-8", errors='ignore')}")
-            logger.debug(f"STDERR: {result.stderr.decode("utf-8", errors='ignore')}")
+            logger.debug(f"STDOUT: {result.stdout.decode('utf-8', errors='ignore')}")
+            logger.debug(f"STDERR: {result.stderr.decode('utf-8', errors='ignore')}")
             return result.returncode == 0
 
         except subprocess.CalledProcessError as e:
