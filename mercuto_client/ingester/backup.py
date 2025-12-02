@@ -7,8 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path, PosixPath
 from typing import Any, Callable, Optional
 from urllib.parse import ParseResult, parse_qs, unquote
-
-import requests
+from urllib.request import url2pathname
 
 logger = logging.getLogger(__name__)
 
@@ -65,17 +64,20 @@ class IBackupHandler(ABC):
 
 class CSCPBackup(IBackupHandler):
     """
-    Compressed SCP Backup handler (cscp://).
+    Compressed SCP Backup handler (cscp://username@hostname:port/path?private_key=xxx).
     Uses SCP to copy files to a remote server, with optional post-transfer script execution.
     Use query parameters to specify additional options:
     - private_key: Path to the private key file for authentication.
     - script: A script to run on the remote server after file transfer. The script can use
       the placeholder '{destination}' to refer to the path of the transferred file.
+    - disable_strict_checking: If set to 'yes', disables strict checking of host keys, known_hosts file is not used, and user private keys can be open.
+        It adds the following options to the scp/ssh command: oStrictHostKeyChecking=no, oUserKnownHostsFile=/dev/null
     """
     @dataclass
     class SCPBackupParams:
         private_key: Optional[Path] = None
         script: Optional[str] = None
+        disable_strict_checking: Optional[str] = None
 
         @staticmethod
         def load(config: dict[str, Any]) -> 'CSCPBackup.SCPBackupParams':
@@ -94,7 +96,7 @@ class CSCPBackup(IBackupHandler):
             """
             result: dict[str, Any] = {}
             keys = list(query.keys())
-            known_keys = ['private_key', 'script']
+            known_keys = ['private_key', 'script', 'disable_strict_checking']
             for _key in known_keys:
                 if _key in query:
                     if len(query[_key]) > 1:
@@ -110,6 +112,12 @@ class CSCPBackup(IBackupHandler):
         self.params: Optional[CSCPBackup.SCPBackupParams] = None
         super().__init__(url)
 
+        self.port = 22
+        if self.url.port is not None:
+            self.port = self.url.port
+
+        self.backup_path = Path(url2pathname(self.url.path))
+
     def validate_url(self):
         if self.url.hostname is None:
             raise RuntimeError("No hostname specified for backup")
@@ -119,30 +127,29 @@ class CSCPBackup(IBackupHandler):
     def process_file(self, filename: str) -> bool:
         if self.send_file(filename):
             return self.run_script(filename)
-
         return False
 
     def send_file(self, filename: str) -> bool:
-        command = ['scp', '-oBatchMode=yes']
+        if self.params is None:
+            raise ValueError("Backup parameters not set")
+        command = ['scp', '-O', '-oBatchMode=yes']
+        if self.params.disable_strict_checking == 'yes':
+            command.append('-oStrictHostKeyChecking=no')
+            command.append('-oUserKnownHostsFile=/dev/null')
+
         dest = ""
         if self.url.username is not None:
             dest = f"{self.url.username}@"
 
         dest = f'{dest}{self.url.hostname}'
-
-        port = 22
-        if self.url.port is not None:
-            port = self.url.port
-
         command.append('-P')
-        command.append(str(port))
+        command.append(str(self.port))
 
-        if self.params is not None:
-            if self.params.private_key is not None:
-                command.append('-i')
-                command.append(str(self.params.private_key))
+        if self.params.private_key is not None:
+            command.append('-i')
+            command.append(str(self.params.private_key))
 
-        dest = f'{dest}:{self.url.path}'
+        dest = f'{dest}:{self.backup_path}'
 
         command.append(filename)
         command.append(dest)
@@ -164,32 +171,35 @@ class CSCPBackup(IBackupHandler):
             return True
         elif self.params.script is None:
             return True
-        else:
-            command = ['ssh', '-oBatchMode=yes']
-            if self.url.username is not None:
-                command.append('-l')
-                command.append(self.url.username)
+        command = ['ssh', '-oBatchMode=yes']
 
-            port = 22
-            if self.url.port is not None:
-                port = self.url.port
+        if self.params.disable_strict_checking == 'yes':
+            command.append('-oStrictHostKeyChecking=no')
+            command.append('-oUserKnownHostsFile=/dev/null')
+        if self.url.username is not None:
+            command.append('-l')
+            command.append(self.url.username)
 
-            command.append('-p')
-            command.append(str(port))
+        port = 22
+        if self.url.port is not None:
+            port = self.url.port
 
-            if self.params.private_key is not None:
-                command.append('-i')
-                command.append(str(self.params.private_key))
+        command.append('-p')
+        command.append(str(port))
 
-            if self.url.hostname is None:
-                raise RuntimeError("No hostname specified for backup")
-            command.append(self.url.hostname)
+        if self.params.private_key is not None:
+            command.append('-i')
+            command.append(str(self.params.private_key))
 
-            dest_folder = PosixPath(self.url.path)
-            fn = Path(filename)
+        if self.url.hostname is None:
+            raise RuntimeError("No hostname specified for backup")
+        command.append(self.url.hostname)
 
-            command.append(self.params.script.format(destination=dest_folder / fn.name))
-            logger.debug(f'Script Command: {" ".join(command)}')
+        dest_folder = PosixPath(self.backup_path)
+        fn = Path(filename)
+
+        command.append(self.params.script.format(destination=dest_folder / fn.name))
+        logger.debug(f'Script Command: {" ".join(command)}')
         try:
             logger.debug(f'Script Command: {" ".join(command)}')
             result = subprocess.run(command, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -210,34 +220,34 @@ class FileBackup(IBackupHandler):
     """
 
     def __init__(self, url: ParseResult):
-        self.backup_path: Optional[Path] = None
         super().__init__(url)
+        self.backup_path = Path(url2pathname(self.url.path))
+        query = self.decode_query()
+        self.create = False
+        if 'create' in query:
+            create = query['create']
+            if not isinstance(create, list) or len(create) != 1 or not isinstance(create[0], str):
+                raise ValueError(f"{self} create query element has wrong length: {len(create)}, expected 1")
+            create = create[0].lower()
+            if create in ['true', 'yes', 'y']:
+                self.create = True
+
+        if not self.create and not self.backup_path.exists():
+            raise ValueError(f"{self.backup_path} backup path does not exist")
 
     def validate_url(self):
         if self.url.scheme.lower() != 'file':
             raise ValueError(f"{self} url scheme must be 'file'")
-        self.backup_path = Path(unquote(self.url.path))
-        if not self.backup_path.exists():
-            query = self.decode_query()
-            create = False
-            if 'create' in query:
-                create = query['create']
-                if len(create) != 1:
-                    raise ValueError(f"{self} create query element has wrong length: {len(create)}, expected 1")
-                create = create[0].lower()
-                if create in ['true', 'yes', 'y']:
-                    create = True
-            if create:
-                self.backup_path.mkdir(parents=True, exist_ok=True)
-                logger.info(f"Created backup path: {self.backup_path}")
-            else:
-                raise ValueError(f"{self.backup_path} backup path does not exist")
-        if not self.backup_path.is_dir():
-            raise ValueError(f"{self.backup_path} backup path must be a directory")
 
     def process_file(self, filename: str) -> bool:
-        if self.backup_path is None:
-            raise RuntimeError("No backup path specified")
+        if not self.create and not self.backup_path.exists():
+            raise ValueError(f"{self.backup_path} backup path does not exist")
+        elif self.create and not self.backup_path.exists():
+            self.backup_path.mkdir(parents=True, exist_ok=True)
+            logger.info(f"Created backup path: {self.backup_path}")
+
+        if not self.backup_path.is_dir():
+            raise ValueError(f"{self.backup_path} backup path must be a directory")
 
         dest = self.backup_path / Path(filename).name
         shutil.copyfile(filename, dest)
@@ -254,19 +264,59 @@ class HTTPBackup(IBackupHandler):
         if self.url.scheme.lower() not in ['http', 'https']:
             raise ValueError(f"{self} url scheme must be 'http' or 'https'")
 
-    def _process_file(self, filename: str) -> tuple[bool, int]:
+    def process_file(self, filename: str) -> bool:
+        import requests  # import here to avoid dependency if not used
         with open(filename, "rb") as f:
-            files = {"file": (Path(filename).name, f, "text/plain")}
+            files = {"file": (Path(filename).name, f)}
             response = requests.post(self.url.geturl(), files=files)
-            response_data = response.json()
-            result = response_data.get('result', False)
+            return response.ok
 
-            logger.debug(f"HTTP Response: {response.status_code} - {response_data}")
-            return result, response.status_code
+
+class FTPBackup(IBackupHandler):
+    """
+    FTP Backup handler (ftp:// or ftps://).
+    Uses FTP to send files to a specified URL.
+    """
+
+    def __init__(self, url: ParseResult):
+        super().__init__(url)
+        import ftplib
+
+        self._ftp: Optional[ftplib.FTP | ftplib.FTP_TLS] = None
+        self._port = self.url.port or (21 if self.url.scheme.lower() == 'ftp' else 990)
+
+        if self.url.scheme.lower() == 'ftps':
+            self._ftp = ftplib.FTP_TLS()
+        else:
+            self._ftp = ftplib.FTP()
+
+    def validate_url(self):
+        if self.url.scheme.lower() not in ['ftp', 'ftps']:
+            raise ValueError(f"{self} url scheme must be 'ftp' or 'ftps'")
+
+        if self.url.hostname is None:
+            raise ValueError(f"{self} url must specify a hostname")
 
     def process_file(self, filename: str) -> bool:
-        result, status_code = self._process_file(filename)
-        return result and status_code == 200
+        # Send file via FTP
+        try:
+            assert self._ftp is not None
+            assert self.url.hostname is not None
+            self._ftp.connect(self.url.hostname, self._port)
+
+            username = self.url.username or 'anonymous'
+            password = self.url.password or ''
+            self._ftp.login(username, password)
+
+            dest_path = self.url.path
+            with open(filename, 'rb') as f:
+                self._ftp.storbinary(f'STOR {dest_path}/{Path(filename).name}', f)
+            self._ftp.quit()
+            return True
+
+        except Exception as e:
+            logger.error(f"FTP error: {e}")
+            return False
 
 
 def get_backup_handler(url: ParseResult) -> Callable[[str], bool]:
@@ -277,11 +327,13 @@ def get_backup_handler(url: ParseResult) -> Callable[[str], bool]:
             return HTTPBackup(url)
         case "https":
             return HTTPBackup(url)
-
-        # case "scp":
-        #     return SCPBackup(url)
-        # case "cscp":
-        #     return CSCPBackup(url)
-
+        case "ftp":
+            return FTPBackup(url)
+        case "ftps":
+            return FTPBackup(url)
+        case "cscp":
+            return CSCPBackup(url)
+        case "scp":
+            return CSCPBackup(url)
         case _:
-            raise RuntimeError(f"Unsupported scheme: {url.scheme}")
+            raise ValueError(f"Unsupported scheme: {url.scheme}")
