@@ -17,6 +17,8 @@ from .modules.data import MercutoDataService
 from .modules.fatigue import MercutoFatigueService
 from .modules.identity import MercutoIdentityService
 from .modules.media import MercutoMediaService
+from .modules.notifications import MercutoNotificationService
+from .modules.reports import MercutoReportService
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +40,7 @@ class MercutoClient:
         if url.endswith('/'):
             url = url[:-1]
 
-        if not url.startswith('https://'):
+        if verify_ssl and not url.startswith('https://'):
             raise ValueError(f'Url must be https, is {url}')
 
         self._url = url
@@ -191,6 +193,12 @@ class MercutoClient:
 
     def media(self) -> 'MercutoMediaService':
         return self._add_and_fetch_module('media', MercutoMediaService)
+
+    def reports(self) -> 'MercutoReportService':
+        return self._add_and_fetch_module('reports', MercutoReportService)
+
+    def notifications(self) -> 'MercutoNotificationService':
+        return self._add_and_fetch_module('notifications', MercutoNotificationService)
 
     def login(self, authentication: IAuthenticationMethod) -> None:
         self._auth_method = authentication

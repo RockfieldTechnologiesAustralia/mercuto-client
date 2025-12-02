@@ -70,7 +70,8 @@ def launch_mercuto_ingester(
     ftp_server_port: int = 2121,
     ftp_server_rename: bool = True,
     max_attempts: int = 1000,
-    backup_location: Optional[list[ParseResult]] = None
+    backup_location: Optional[list[ParseResult]] = None,
+    timezone: Optional[str] = None,
 ):
 
     if backup_location is None:
@@ -133,6 +134,7 @@ def launch_mercuto_ingester(
             api_key=api_key,
             hostname=hostname,
             verify_ssl=verify_ssl,
+            timezone=timezone
         )
 
         if mapping is not None:
@@ -232,11 +234,16 @@ def main():
     parser.add_argument('-i', '--insecure', action="store_true",
                         help='Disable SSL verification',
                         default=False)
-    parser.add_argument('-b', '--backup_location', action="append",
+    parser.add_argument('-b', '--backup-location', action="append",
                         help='Backup location to store ingested files. Must be a valid URL, e.g. scp://user@host/path. '
                         'Can be specified multiple times.',
                         type=urlparse)
     parser.add_argument('-e', '--pid-file', help='Ths location to create the PID file', type=Path, default=None)
+    parser.add_argument('--timezone', type=str,
+                        help='Timezone to use for data uploads (e.g. "Australia/Melbourne"). \
+                        If not provided, no timezone will be sent on uploads. \
+                        Only needed if data files do not contain timezone information (E.g. Campbell Scientific loggers).',
+                        default=None)
 
     args = parser.parse_args()
 
@@ -258,7 +265,9 @@ def main():
         ftp_server_port=args.port,
         ftp_server_rename=not args.no_rename,
         max_attempts=args.max_attempts,
-        backup_location=args.backup_location
+        backup_location=args.backup_location,
+        hostname=args.hostname,
+        timezone=args.timezone
     )
 
 
