@@ -122,6 +122,10 @@ def launch_mercuto_ingester(
             target_free_space_mb = get_free_space_excluding_files(buffer_directory) * 0.25 // (1024 * 1024)  # Convert to MB
             logging.info(f"Target remaining free space set to {target_free_space_mb} MB based on available disk space.")
 
+            if target_free_space_mb <= 1:
+                raise ValueError("Not enough free space on the buffer partition to set a reasonable target free space. "
+                                 "Please specify either a larger buffer directory or set the target free space or max files manually.")
+
         logger.info(f"Using work directory: {workdir}")
 
         database_path = os.path.join(workdir, "buffer.db")

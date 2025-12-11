@@ -46,20 +46,24 @@ def get_directory_size(directory: str) -> int:
 
 def get_free_space_excluding_files(directory: str) -> int:
     """
-    Returns the number of free bytes on the partition of the target directory,
-    excluding the total size of files in that directory.
+    Estimates the free bytes on the partition of the target directory
+    as if the directory itself were empty.
+
+    In other words, it adds back the space currently consumed by files
+    within the target directory to the partition's free space.
 
     :param directory: Path to the target directory.
-    :return: Free bytes available in the partition after subtracting file sizes.
+    :return: Estimated free bytes if the directory were empty.
     """
-    # Get partition's free space
-    _, _, free = shutil.disk_usage(directory)
+    # Get partition's free space (already excludes the directory's files)
+    total, _, free = shutil.disk_usage(directory)
 
     # Calculate the total size of files in the directory
     files_size = get_directory_size(directory)
 
-    # Exclude file sizes from free space
-    return max(0, free - files_size)
+    # Add back the directory's file sizes to estimate free space if empty
+    # Clamp to the partition's total capacity just in case
+    return min(total, free + files_size)
 
 
 T = TypeVar('T')
