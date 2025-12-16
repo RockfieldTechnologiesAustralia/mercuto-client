@@ -485,7 +485,11 @@ class MercutoCoreService:
                       device_type_code: str,
                       groups: list[str],
                       location_description: Optional[str] = None,
-                      channels: Optional[list[DeviceChannel]] = None) -> Device:
+                      channels: Optional[list[DeviceChannel]] = None,
+                      latitude: Optional[float] = None,
+                      longitude: Optional[float] = None,
+                      altitude: Optional[float] = None
+                      ) -> Device:
         json: PayloadType = {
             'project_code': project_code,
             'label': label,
@@ -496,6 +500,12 @@ class MercutoCoreService:
             json['location_description'] = location_description
         if channels is not None:
             json['channels'] = [channel.model_dump(mode='json') for channel in channels]  # type: ignore[assignment]
+        if latitude is not None:
+            json['latitude'] = latitude
+        if longitude is not None:
+            json['longitude'] = longitude
+        if altitude is not None:
+            json['altitude'] = altitude
         r = self._client.request('/devices', 'PUT', json=json)
         return Device.model_validate_json(r.text)
 
