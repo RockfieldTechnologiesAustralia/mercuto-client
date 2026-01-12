@@ -326,6 +326,32 @@ class MockMercutoDataService(MercutoDataService, metaclass=EnforceOverridesMeta)
             for (channel, timestamp), row in filtered.iterrows()
         ][:limit]
 
+    def load_secondary_samples(
+        self,
+        channels: Collection[str],
+        start_time: datetime,
+        end_time: datetime,
+        limit: int = 100
+    ) -> list[SecondaryDataSample]:
+        idx = self._secondary_and_primary_buffer.index
+        mask = (
+            idx.get_level_values('channel').isin(channels) &
+            (idx.get_level_values('timestamp') >= start_time) &
+            (idx.get_level_values('timestamp') <= end_time)
+        )
+        filtered = self._secondary_and_primary_buffer[mask]
+        return [
+            SecondaryDataSample(
+                channel=channel,
+                timestamp=timestamp,
+                value=row['value']
+            )
+            for (channel, timestamp), row in filtered.iterrows()
+        ][:limit]
+
+    def list_datatables(self, project: str) -> list[Datatable]:
+        return [dt for dt in self._datatables.values() if dt.project == project]
+
     def create_datatable(self, project: str, name: str, sampling_period: timedelta, column_labels: Collection[str]) -> Datatable:
         if sampling_period <= timedelta(seconds=1):
             classification = ChannelClassification.PRIMARY
