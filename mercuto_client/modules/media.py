@@ -263,6 +263,15 @@ class MercutoMediaService:
         return init_request_response.request_id
 
     # --- Cameras ---
+    def list_cameras(self, project: str) -> list[Camera]:
+        r = self._client.request(
+            f"{self._path}/cameras", "GET", params={'project': project})
+        return [Camera.model_validate_json(item) for item in r.json()]
+
+    def get_camera(self, camera_code: str) -> Camera:
+        r = self._client.request(
+            f"{self._path}/cameras/{camera_code}", "GET")
+        return Camera.model_validate_json(r.text)
 
     def create_camera(self, project: str,
                       label: str,

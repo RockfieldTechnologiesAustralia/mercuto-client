@@ -14,7 +14,7 @@ class Parser(Protocol):
         """
         Parse the file and return a list of SecondaryDataSample objects.
         """
-        pass
+        ...
 
 
 def detect_parser(filename: str) -> Parser:

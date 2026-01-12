@@ -72,6 +72,7 @@ def launch_mercuto_ingester(
     max_attempts: int = 1000,
     backup_location: Optional[list[ParseResult]] = None,
     timezone: Optional[str] = None,
+    camera: Optional[str] = None
 ):
 
     if backup_location is None:
@@ -138,7 +139,8 @@ def launch_mercuto_ingester(
             api_key=api_key,
             hostname=hostname,
             verify_ssl=verify_ssl,
-            timezone=timezone
+            timezone=timezone,
+            camera_code=camera
         )
 
         if mapping is not None:
@@ -248,6 +250,9 @@ def main():
                         If not provided, no timezone will be sent on uploads. \
                         Only needed if data files do not contain timezone information (E.g. Campbell Scientific loggers).',
                         default=None)
+    parser.add_argument('--camera', type=str,
+                        help='Camera code to associate with image uploads. If not provided, image files will error on upload.',
+                        default=None)
 
     args = parser.parse_args()
 
@@ -271,7 +276,8 @@ def main():
         max_attempts=args.max_attempts,
         backup_location=args.backup_location,
         hostname=args.hostname,
-        timezone=args.timezone
+        timezone=args.timezone,
+        camera=args.camera
     )
 
 
