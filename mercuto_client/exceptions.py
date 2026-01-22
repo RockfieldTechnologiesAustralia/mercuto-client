@@ -17,3 +17,7 @@ class MercutoHTTPException(MercutoClientException):
 
     def __str__(self) -> str:
         return f"MercutoHTTPException(status_code='{self.status_code}', message='{self.message}')"
+
+
+class MercutoNotFoundException(Exception):
+    pass
