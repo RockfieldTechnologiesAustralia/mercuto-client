@@ -319,6 +319,13 @@ class MercutoDataService:
     Units
     """
 
+    def get_unit(self, code: str) -> Optional[Units]:
+        r = self._client.request(f'{self._path}/units/{code}', 'GET', raise_for_status=False)
+        if r.status_code == 404:
+            return None
+        raise_for_response(r)
+        return Units.model_validate_json(r.text)
+
     def list_units(self) -> list[Units]:
         r = self._client.request(f'{self._path}/units', 'GET')
         return _UnitslistAdapter.validate_json(r.text)
