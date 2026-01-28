@@ -13,7 +13,7 @@ from ..modules.data import (AggregationOptions, Channel, ChannelClassification,
                             ChannelFormat, Datatable, DatatableColumn,
                             FileFormat, FrameFormat, GetStatusRequestResponse,
                             LatestDataSample, MercutoDataService,
-                            MetricDataSample, SecondaryDataSample)
+                            MetricDataSample, SecondaryDataSample, Units)
 from ._utility import EnforceOverridesMeta
 
 logger = logging.getLogger(__name__)
@@ -33,6 +33,7 @@ class MockMercutoDataService(MercutoDataService, metaclass=EnforceOverridesMeta)
 
         self._channels: dict[str, Channel] = {}
         self._datatables: dict[str, Datatable] = {}
+        self._units: dict[str, Units] = {}
 
     def _last_timestamp(self, channel: str) -> Optional[datetime]:
         if channel in self._secondary_and_primary_buffer.index.get_level_values('channel'):
@@ -106,6 +107,25 @@ class MockMercutoDataService(MercutoDataService, metaclass=EnforceOverridesMeta)
                           is_wallclock_interval=False)
         self._channels[code] = channel
 
+        return channel
+
+    def update_channel(self, code: str, label: Optional[str] = None, units: Optional[str] = None,
+                       metric: Optional[str] = None, multiplier: Optional[float] = None,
+                       offset: Optional[float] = None) -> Channel:
+        if code not in self._channels:
+            raise MercutoHTTPException(status_code=404, message="Channel not found")
+        channel = self._channels[code]
+        if label is not None:
+            channel.label = label
+        if units is not None:
+            channel.units = self.get_unit(units)
+        if metric is not None:
+            channel.metric = metric
+        if multiplier is not None:
+            channel.multiplier = multiplier
+        if offset is not None:
+            channel.offset = offset
+        self._channels[code] = channel
         return channel
 
     def create_request(self,
@@ -426,3 +446,15 @@ class MockMercutoDataService(MercutoDataService, metaclass=EnforceOverridesMeta)
                                         timestamp=timestamp,
                                         value=row['value']))
         return out
+
+    def get_unit(self, code: str) -> Optional[Units]:
+        return self._units.get(code)
+
+    def list_units(self) -> list[Units]:
+        return list(self._units.values())
+
+    def create_unit(self, name: str, unit: str) -> Units:
+        code = str(uuid.uuid4())
+        unit_obj = Units(code=code, name=name, unit=unit)
+        self._units[code] = unit_obj
+        return unit_obj
