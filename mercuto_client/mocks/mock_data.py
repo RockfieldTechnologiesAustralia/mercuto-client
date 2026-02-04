@@ -9,7 +9,8 @@ import pandas as pd
 
 from ..client import MercutoClient
 from ..exceptions import MercutoHTTPException
-from ..modules.data import (AggregationOptions, Channel, ChannelClassification,
+from ..modules.data import (AggregationInterval, AggregationMethod,
+                            AggregationOptions, Channel, ChannelClassification,
                             ChannelFormat, Datatable, DatatableColumn,
                             FileFormat, FrameFormat, GetStatusRequestResponse,
                             LatestDataSample, MercutoDataService,
@@ -149,9 +150,6 @@ class MockMercutoDataService(MercutoDataService, metaclass=EnforceOverridesMeta)
         if channels is None and classification is None:
             raise ValueError("Must supply either channels or classification.")
 
-        if aggregation is not None:
-            raise NotImplementedError("MockMercutoDataService does not support aggregation.")
-
         if channels is None:
             assert classification is not None
             assert project is not None
@@ -178,6 +176,26 @@ class MockMercutoDataService(MercutoDataService, metaclass=EnforceOverridesMeta)
         assert ts.columns == ['value']
         assert ts.index.names == ['channel', 'timestamp']
 
+        # Apply aggregation options
+        if aggregation is not None:
+            if aggregation.method != AggregationMethod.MEAN:
+                raise NotImplementedError(f"Unsupported aggregation method for MockClient: {aggregation.method}")
+            if aggregation.interval != AggregationInterval.DAY:
+                raise NotImplementedError(f"Unsupported aggregation interval for MockClient: {aggregation.interval}")
+            if not aggregation.rolling:
+                raise NotImplementedError("MockClient only supports rolling aggregation.")
+            ts = (
+                ts.reset_index()  # type: ignore
+                .sort_values(['channel', 'timestamp'])
+                .groupby('channel')
+                .rolling('1D', on='timestamp', min_periods=1)['value']
+                .mean()
+                .reset_index()
+                .set_index(['channel', 'timestamp'])
+                .sort_index()
+            )
+            assert ts.columns == ['value']
+            assert ts.index.names == ['channel', 'timestamp']
         if frame_format == FrameFormat.COLUMNS:
             ts = ts.reset_index(drop=False).pivot(index='timestamp',
                                                   columns='channel',
