@@ -2,6 +2,8 @@ from typing import TYPE_CHECKING, Any, Literal, Optional
 
 from pydantic import AwareDatetime, TypeAdapter
 
+from .data import AggregationInterval, AggregationMethod
+
 if TYPE_CHECKING:
     from ..client import MercutoClient
 
@@ -14,6 +16,9 @@ class Healthcheck(BaseModel):
 
 
 class Condition(BaseModel):
+    class ConditionAggregationOption(BaseModel):
+        method: AggregationMethod
+        interval: AggregationInterval
     code: str
     project: str
     description: Optional[str]
@@ -26,6 +31,7 @@ class Condition(BaseModel):
     lower_start_threshold: Optional[float] = None
     upper_end_threshold: Optional[float] = None
     lower_end_threshold: Optional[float] = None
+    aggregation: Optional[ConditionAggregationOption] = None
     type: Literal['channel-range', 'bulk-channel-range']
 
 
