@@ -53,8 +53,8 @@ class WireguardClientSchema(BaseModel):
 
 class WireguardInterfaceSchema(BaseModel):
     code: str
-    tenant_code: str
-    # tenant_name: str
+    tenant_code: Optional[str] = None
+    isolation_group_code: Optional[str] = None
     interface_name: str
     private_key: Optional[str] = None
     public_key: str
@@ -64,6 +64,11 @@ class WireguardInterfaceSchema(BaseModel):
     hostname: str
     ip_address: Optional[str] = None
     devices: List[WireguardClientSchema] = Field(default_factory=list)
+
+    @model_validator(mode='after')
+    def has_tenant_or_issolation_group(self):
+        if self.tenant_code is None and self.isolation_group_code is None:
+            raise ValueError('Either "tenent_code" or "isolation_group_code" is required.')
 
 
 class WireguardServerListSchema(BaseModel):
