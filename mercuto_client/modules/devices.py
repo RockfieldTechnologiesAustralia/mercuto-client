@@ -1,7 +1,7 @@
 from enum import Enum
 from typing import TYPE_CHECKING, List, Optional
 
-from pydantic import BaseModel, Field, TypeAdapter
+from pydantic import BaseModel, Field, TypeAdapter, model_validator
 from pydantic_core.core_schema import bool_schema
 
 from mercuto_client.exceptions import (MercutoClientException,
