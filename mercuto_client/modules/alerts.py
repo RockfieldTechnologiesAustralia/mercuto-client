@@ -1,3 +1,4 @@
+from datetime import timedelta
 from typing import TYPE_CHECKING, Any, Literal, Optional
 
 from pydantic import AwareDatetime, TypeAdapter
@@ -25,13 +26,14 @@ class Condition(BaseModel):
     check_type: Literal['event', 'interval']
 
     match_on: Optional[str] = None
-    match_type: Optional[Literal['channel_label_pattern', 'channel_code', 'device_label_pattern', 'device_type_code']] = None
+    match_type: Optional[Literal['channel-label-pattern', 'channel-code', 'device-label-pattern', 'device-type-code']] = None
     field: Optional[str] = None
     upper_start_threshold: Optional[float] = None
     lower_start_threshold: Optional[float] = None
     upper_end_threshold: Optional[float] = None
     lower_end_threshold: Optional[float] = None
     aggregation: Optional[ConditionAggregationOption] = None
+    duration_threshold: Optional[timedelta] = None
     type: Literal['channel-range', 'channel-offline']
 
 
