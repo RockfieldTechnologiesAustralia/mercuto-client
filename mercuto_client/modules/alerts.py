@@ -24,15 +24,15 @@ class Condition(BaseModel):
     description: Optional[str]
     check_type: Literal['event', 'interval']
 
-    channel: Optional[str] = None
-    device_type: Optional[str] = None
+    match_on: Optional[str] = None
+    match_type: Optional[Literal['channel_label_pattern', 'channel_code', 'device_label_pattern', 'device_type_code']] = None
     field: Optional[str] = None
     upper_start_threshold: Optional[float] = None
     lower_start_threshold: Optional[float] = None
     upper_end_threshold: Optional[float] = None
     lower_end_threshold: Optional[float] = None
     aggregation: Optional[ConditionAggregationOption] = None
-    type: Literal['channel-range', 'bulk-channel-range']
+    type: Literal['channel-range', 'channel-offline']
 
 
 class AlarmCondition(BaseModel):
@@ -102,7 +102,7 @@ class MercutoAlertService:
         return _ConditionListAdapter.validate_json(r.text)
 
     def create_condition(self, /, **args: Any) -> Condition:
-        r = self._client.request(f"{self._path}/conditions", "PUT", json=args)
+        r = self._client.request(f"{self._path}/conditions", "POST", json=args)
         return Condition.model_validate_json(r.text)
 
     def get_condition(self, condition_code: str) -> Condition:
@@ -112,7 +112,7 @@ class MercutoAlertService:
 
     def update_condition(self, condition_code: str, /, **args: Any) -> Condition:
         r = self._client.request(
-            f"{self._path}/conditions/{condition_code}", "PATCH", json=args)
+            f"{self._path}/conditions/{condition_code}", "PUT", json=args)
         return Condition.model_validate_json(r.text)
 
     def delete_condition(self, condition_code: str) -> None:
@@ -133,7 +133,7 @@ class MercutoAlertService:
         return _AlarmListAdapter.validate_json(r.text)
 
     def create_alarm(self, /, **args: Any) -> Alarm:
-        r = self._client.request(f"{self._path}/alarms", "PUT", json=args)
+        r = self._client.request(f"{self._path}/alarms", "POST", json=args)
         return Alarm.model_validate_json(r.text)
 
     def get_alarm(self, alarm_code: str) -> Alarm:
@@ -142,7 +142,7 @@ class MercutoAlertService:
 
     def update_alarm(self, alarm_code: str, /, **args: Any) -> Alarm:
         r = self._client.request(
-            f"{self._path}/alarms/{alarm_code}", "PATCH", json=args)
+            f"{self._path}/alarms/{alarm_code}", "PUT", json=args)
         return Alarm.model_validate_json(r.text)
 
     def delete_alarm(self, alarm_code: str) -> None:
