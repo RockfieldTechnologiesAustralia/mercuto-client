@@ -13,6 +13,8 @@ from ..exceptions import MercutoHTTPException
 from . import PayloadType
 from ._util import BaseModel
 
+CameraType = Literal['BOSCH', 'DIRECT_RTSP', 'STATIC', 'ROCKFIELD-CAMERA-SERVER-VERSION-2']
+
 
 class Image(BaseModel):
     code: str
@@ -68,8 +70,7 @@ class Camera(BaseModel):
     project: str
     label: str
     triggers: list[CameraTrigger]
-    camera_type: Literal['BOSCH', 'DIRECT_RTSP',
-                         'STATIC', 'ROCKFIELD-CAMERA-SERVER-VERSION-2']
+    camera_type: CameraType
     encode_timestamp: bool = True
     encode_blur: bool = False
     blur_steps: Optional[int] = None
@@ -290,8 +291,7 @@ class MercutoMediaService:
                       camera_username: Optional[str] = None,
                       camera_password: Optional[str] = None,
                       camera_serial: Optional[str] = None,
-                      camera_type: Literal['BOSCH', 'DIRECT_RTSP', 'STATIC',
-                                           'ROCKFIELD-CAMERA-SERVER-VERSION-2'] = 'DIRECT_RTSP',
+                      camera_type: CameraType = 'DIRECT_RTSP',
                       rtsp_url: Optional[str] = None,) -> Camera:
         payload: PayloadType = {
             'label': label,
