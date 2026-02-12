@@ -264,3 +264,7 @@ class MercutoDevicesService:
     def wireguard_server_get_config_ts(self):
         r = self._client.request(f"{self._path}/wireguard/server/config-version", "GET",)
         return _OptionalFloatAdaptor.validate_json(r.text)
+
+    def wireguard_server_get_server_ts(self):
+        r = self._client.request(f"{self._path}/wireguard/server/server-version", "GET",)
+        return _OptionalFloatAdaptor.validate_json(r.text)
