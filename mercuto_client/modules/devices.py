@@ -166,7 +166,7 @@ class MercutoDevicesService:
                                 serial_number: str,
                                 project_code: str
                                 ) -> NetworkEndpointSchema:
-        r = self._client.request(f"{self._path}/network_endpoint", "PUT",
+        r = self._client.request(f"{self._path}/network_endpoint", "POST",
                                  params=dict(
                                      network_endpoint_type_code=network_endpoint_type_code,
                                      serial_number=serial_number,
@@ -225,7 +225,7 @@ class MercutoDevicesService:
         )
         if allowed_ips is not None:
             params['allowed_ips'] = allowed_ips
-        r = self._client.request(f"{self._path}/wireguard/client", "PUT", params=params)
+        r = self._client.request(f"{self._path}/wireguard/client", "POST", params=params)
 
         return _WireguardClientAdaptor.validate_json(r.text)
 
