@@ -26,7 +26,8 @@ class Condition(BaseModel):
     check_type: Literal['event', 'interval']
 
     match_on: Optional[str] = None
-    match_type: Optional[Literal['channel-label-pattern', 'channel-code', 'device-label-pattern', 'device-type-code']] = None
+    match_type: Optional[Literal['channel-label-pattern', 'channel-code', 'device-label-pattern',
+                                 'device-type-code', 'camera-label-pattern', 'camera-code']] = None
     field: Optional[str] = None
     upper_start_threshold: Optional[float] = None
     lower_start_threshold: Optional[float] = None
@@ -34,7 +35,7 @@ class Condition(BaseModel):
     lower_end_threshold: Optional[float] = None
     aggregation: Optional[ConditionAggregationOption] = None
     duration_threshold: Optional[timedelta] = None
-    type: Literal['channel-range', 'channel-offline']
+    type: Literal['channel-range', 'channel-offline', 'camera-offline']
 
 
 class AlarmCondition(BaseModel):
@@ -60,7 +61,8 @@ class ConditionLog(BaseModel):
     start_time: AwareDatetime
     end_time: AwareDatetime
 
-    channel: Optional[str]
+    target_code: str
+    target_type: Literal['channel', 'camera']
     start_value: Optional[float]
     end_value: Optional[float]
     peak_value: Optional[float]
