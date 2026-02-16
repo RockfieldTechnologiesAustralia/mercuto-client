@@ -66,7 +66,7 @@ class WireguardInterfaceSchema(BaseModel):
     devices: List[WireguardClientSchema] = Field(default_factory=list)
 
     @model_validator(mode='after')
-    def has_tenant_or_issolation_group(self):
+    def has_tenant_or_isolation_group(self):
         if self.tenant_code is None and self.isolation_group_code is None:
             raise ValueError('Either "tenent_code" or "isolation_group_code" is required.')
         return self
