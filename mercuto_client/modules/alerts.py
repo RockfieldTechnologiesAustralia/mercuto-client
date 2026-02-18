@@ -48,7 +48,6 @@ class Alarm(BaseModel):
     project: str
     label: str
     severity: int
-    colour: str
     contact_group: Optional[str]
     check_type: Literal['event', 'interval']
     conditions: list[AlarmCondition]
@@ -78,7 +77,6 @@ class AlarmLog(BaseModel):
     acknowledged_at: Optional[AwareDatetime]
     event: Optional[str]
     severity: int
-    colour: str
     alarm: str
     condition_logs: list[ConditionLog]
 
