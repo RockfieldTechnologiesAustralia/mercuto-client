@@ -13,7 +13,7 @@ from ..exceptions import MercutoHTTPException
 from . import PayloadType
 from ._util import BaseModel
 
-CameraType = Literal['BOSCH', 'DIRECT_RTSP', 'STATIC', 'ROCKFIELD-CAMERA-SERVER-VERSION-2']
+CameraType = Literal['BOSCH', 'DIRECT_RTSP', 'STATIC', 'ROCKFIELD-CAMERA-SERVER-VERSION-2', 'VIDAR']
 
 
 class Image(BaseModel):
@@ -91,6 +91,7 @@ class Camera(BaseModel):
 # --- TypeAdapters for lists ---
 _ImagelistAdapter = TypeAdapter(list[Image])
 _VideolistAdapter = TypeAdapter(list[Video])
+_CameralistAdapter = TypeAdapter(list[Camera])
 
 
 class MercutoMediaService:
@@ -267,7 +268,7 @@ class MercutoMediaService:
     def list_cameras(self, project: str) -> list[Camera]:
         r = self._client.request(
             f"{self._path}/cameras", "GET", params={'project': project})
-        return [Camera.model_validate_json(item) for item in r.json()]
+        return _CameralistAdapter.validate_json(r.text)
 
     def get_camera(self, camera_code: str) -> Camera:
         r = self._client.request(

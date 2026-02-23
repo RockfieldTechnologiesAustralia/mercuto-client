@@ -25,7 +25,7 @@ class Condition(BaseModel):
     description: Optional[str]
     check_type: Literal['event', 'interval']
 
-    match_on: Optional[str] = None
+    match_on: Optional[list[str]] = None
     match_type: Optional[Literal['channel-label-pattern', 'channel-code', 'device-label-pattern',
                                  'device-type-code', 'camera-label-pattern', 'camera-code']] = None
     field: Optional[str] = None
