@@ -1,6 +1,6 @@
 from typing import TYPE_CHECKING, Dict, List, Optional, Union
 
-from pydantic import TypeAdapter
+from pydantic import Field, TypeAdapter
 
 if TYPE_CHECKING:
     from ..client import MercutoClient
@@ -26,6 +26,25 @@ class NetworkEndpointSchema(BaseModel):
     project_code: str
     serial_number: str
     network_endpoint_type: NetworkEndpointTypeOutSchema
+
+
+# SSH Algorithm Parameters
+class RSAParams(BaseModel):
+    key_size: int = Field(ge=2048, le=8192, default=4096)
+
+
+class Ed25519Params(BaseModel):
+    pass
+
+
+class RSAAlgorithm(BaseModel):
+    algorithm: str = "rsa"
+    params: Optional[RSAParams] = Field(default_factory=RSAParams)
+
+
+class Ed25519Algorithm(BaseModel):
+    algorithm: str = "ed25519"
+    params: Optional[Ed25519Params] = Field(default_factory=Ed25519Params)
 
 
 # SSH Key Pair
@@ -192,25 +211,51 @@ class MercutoEndpointService:
         return NetworkEndpointSchema.model_validate_json(r.text)
 
     def get_network_endpoint(
-        self, project_code: str, serial_number: str
+        self,
+        network_endpoint_code: Optional[str] = None,
+        serial_number: Optional[str] = None,
     ) -> NetworkEndpointSchema:
         """
-        Retrieve a specific network endpoint by project code and serial number.
+        Retrieve a specific network endpoint by code or serial number.
+        Provide either network_endpoint_code OR serial_number (not both).
         """
+        params: PayloadType = {}
+        if network_endpoint_code is not None:
+            params["network_endpoint_code"] = network_endpoint_code
+        if serial_number is not None:
+            params["serial_number"] = serial_number
         r = self._client.request(
             f"{self._path}/network_endpoint",
             "GET",
-            params={"project_code": project_code, "serial_number": serial_number},
+            params=params,
         )
         return NetworkEndpointSchema.model_validate_json(r.text)
 
     # --- SSH Key Management ---
-    def generate_ssh_keys(self, name: str) -> SSHKeyPair:
+    def generate_ssh_keys(
+        self, algorithm: Union[RSAAlgorithm, Ed25519Algorithm]
+    ) -> SSHKeyPair:
         """
-        Generate a new SSH key pair with the specified name.
+        Generate a new SSH key pair with the specified algorithm.
+        For RSA keys, you can specify key_size (2048-8192, default 4096).
+        For Ed25519 keys, no additional parameters are needed.
+
+        Example:
+            # Generate RSA key with default size (4096)
+            client.endpoint.generate_ssh_keys(RSAAlgorithm())
+
+            # Generate RSA key with custom size
+            client.endpoint.generate_ssh_keys(
+                RSAAlgorithm(params=RSAParams(key_size=2048))
+            )
+
+            # Generate Ed25519 key
+            client.endpoint.generate_ssh_keys(Ed25519Algorithm())
         """
         r = self._client.request(
-            f"{self._path}/ssh/generate_keys", "POST", params={"name": name}
+            f"{self._path}/ssh/generate_keys",
+            "POST",
+            json=algorithm.model_dump(),
         )
         return SSHKeyPair.model_validate_json(r.text)
 
@@ -234,32 +279,38 @@ class MercutoEndpointService:
         self,
         network_endpoint_code: str,
         public_key: str,
-        port: int,
-        comment: Optional[str] = None,
     ) -> SSHPublicKeySchema:
         """
         Register a new SSH public key for a network endpoint.
         """
-        params: PayloadType = {
-            "network_endpoint_code": network_endpoint_code,
-            "public_key": public_key,
-            "port": port,
-        }
-        if comment is not None:
-            params["comment"] = comment
-        r = self._client.request(f"{self._path}/ssh/public_key", "POST", params=params)
+        r = self._client.request(
+            f"{self._path}/ssh/public_key",
+            "POST",
+            json={
+                "network_endpoint_code": network_endpoint_code,
+                "public_key": public_key,
+            },
+        )
         return SSHPublicKeySchema.model_validate_json(r.text)
 
     def get_ssh_public_key(
-        self, network_endpoint_code: str, port: int
+        self,
+        network_endpoint_code: Optional[str] = None,
+        ssh_public_key_code: Optional[str] = None,
     ) -> SSHPublicKeySchema:
         """
-        Retrieve a specific SSH public key by network endpoint code and port.
+        Retrieve a specific SSH public key by network endpoint code or SSH public key code.
+        Provide either network_endpoint_code OR ssh_public_key_code (not both).
         """
+        params: PayloadType = {}
+        if network_endpoint_code is not None:
+            params["network_endpoint_code"] = network_endpoint_code
+        if ssh_public_key_code is not None:
+            params["ssh_public_key_code"] = ssh_public_key_code
         r = self._client.request(
             f"{self._path}/ssh/public_key",
             "GET",
-            params={"network_endpoint_code": network_endpoint_code, "port": port},
+            params=params,
         )
         return SSHPublicKeySchema.model_validate_json(r.text)
 
@@ -275,81 +326,84 @@ class MercutoEndpointService:
     def create_wireguard_interface(
         self,
         interface_name: str,
-        port: int,
-        subnet: int,
-        bits: int,
-        hostname: str,
         tenant_code: Optional[str] = None,
         isolation_group_code: Optional[str] = None,
         private_key: Optional[str] = None,
         public_key: Optional[str] = None,
     ) -> WireguardInterfaceSchema:
         """
-        Create a new WireGuard interface.
+        Create a new WireGuard interface for a tenant or isolation group.
+        Optionally provide keys or let the system generate them.
+        Must provide exactly one of tenant_code or isolation_group_code.
         """
-        params: PayloadType = {
+        body: PayloadType = {
             "interface_name": interface_name,
-            "port": port,
-            "subnet": subnet,
-            "bits": bits,
-            "hostname": hostname,
         }
         if tenant_code is not None:
-            params["tenant_code"] = tenant_code
+            body["tenant_code"] = tenant_code
         if isolation_group_code is not None:
-            params["isolation_group_code"] = isolation_group_code
+            body["isolation_group_code"] = isolation_group_code
         if private_key is not None:
-            params["private_key"] = private_key
+            body["private_key"] = private_key
         if public_key is not None:
-            params["public_key"] = public_key
+            body["public_key"] = public_key
 
-        r = self._client.request(
-            f"{self._path}/wireguard/interface", "POST", params=params
-        )
+        r = self._client.request(f"{self._path}/wireguard/interface", "POST", json=body)
         return WireguardInterfaceSchema.model_validate_json(r.text)
 
-    def get_wireguard_interface(self, interface_code: str) -> WireguardInterfaceSchema:
+    def get_wireguard_interface(
+        self,
+        interface_code: Optional[str] = None,
+        tenant_code: Optional[str] = None,
+    ) -> WireguardInterfaceSchema:
         """
-        Retrieve a specific WireGuard interface by code.
+        Retrieve a WireGuard interface by interface code or tenant code.
+        Provide either interface_code OR tenant_code (not both).
         """
+        params: PayloadType = {}
+        if interface_code is not None:
+            params["interface_code"] = interface_code
+        if tenant_code is not None:
+            params["tenant_code"] = tenant_code
         r = self._client.request(
             f"{self._path}/wireguard/interface",
             "GET",
-            params={"interface_code": interface_code},
+            params=params,
         )
         return WireguardInterfaceSchema.model_validate_json(r.text)
 
-    def delete_wireguard_interface(self, interface_code: str) -> None:
+    def delete_wireguard_interface(self, interface_code: Optional[str] = None) -> bool:
         """
-        Delete a WireGuard interface.
+        Delete a WireGuard interface by its code.
+        Returns True if deletion was successful.
         """
-        self._client.request(
+        params: PayloadType = {}
+        if interface_code is not None:
+            params["interface_code"] = interface_code
+        r = self._client.request(
             f"{self._path}/wireguard/interface",
             "DELETE",
-            params={"interface_code": interface_code},
+            params=params,
         )
-        return None
+        return r.json()
 
     # --- WireGuard Client Management ---
     def register_wireguard_client(
         self,
-        interface_code: str,
         network_endpoint_code: str,
         public_key: str,
-        allowed_ips: str,
-        description: Optional[str] = None,
+        allowed_ips: str = "",
     ) -> WireguardClientSchema:
         """
-        Register a new WireGuard client.
+        Register a new WireGuard client for a network endpoint.
+        The system will automatically find the appropriate WireGuard interface
+        based on the network endpoint's project/tenant.
         """
         params: PayloadType = {
-            "interface_code": interface_code,
             "network_endpoint_code": network_endpoint_code,
             "public_key": public_key,
             "allowed_ips": allowed_ips,
         }
-        if description is not None:
-            params["description"] = description
 
         r = self._client.request(
             f"{self._path}/wireguard/client", "POST", params=params
@@ -357,85 +411,101 @@ class MercutoEndpointService:
         return WireguardClientSchema.model_validate_json(r.text)
 
     def get_wireguard_client(
-        self, network_endpoint_code: str, interface_code: str
+        self,
+        network_endpoint_code: Optional[str] = None,
+        wireguard_client_code: Optional[str] = None,
     ) -> WireguardClientSchema:
         """
-        Retrieve a specific WireGuard client by network endpoint and interface.
+        Retrieve a WireGuard client by network endpoint code or client code.
+        Provide either network_endpoint_code OR wireguard_client_code (not both).
         """
+        params: PayloadType = {}
+        if network_endpoint_code is not None:
+            params["network_endpoint_code"] = network_endpoint_code
+        if wireguard_client_code is not None:
+            params["wireguard_client_code"] = wireguard_client_code
         r = self._client.request(
             f"{self._path}/wireguard/client",
             "GET",
-            params={
-                "network_endpoint_code": network_endpoint_code,
-                "interface_code": interface_code,
-            },
+            params=params,
         )
         return WireguardClientSchema.model_validate_json(r.text)
 
     def delete_wireguard_client(
-        self, network_endpoint_code: str, interface_code: str
-    ) -> None:
+        self,
+        network_endpoint_code: Optional[str] = None,
+        wireguard_client_code: Optional[str] = None,
+    ) -> bool:
         """
-        Delete a WireGuard client.
+        Delete a WireGuard client by network endpoint code or client code.
+        Provide either network_endpoint_code OR wireguard_client_code (not both).
+        Returns True if deletion was successful.
         """
-        self._client.request(
+        params: PayloadType = {}
+        if network_endpoint_code is not None:
+            params["network_endpoint_code"] = network_endpoint_code
+        if wireguard_client_code is not None:
+            params["wireguard_client_code"] = wireguard_client_code
+        r = self._client.request(
             f"{self._path}/wireguard/client",
             "DELETE",
-            params={
-                "network_endpoint_code": network_endpoint_code,
-                "interface_code": interface_code,
-            },
+            params=params,
         )
-        return None
+        return r.json()
 
     def get_wireguard_client_configuration(
-        self, network_endpoint_code: str, interface_code: str
+        self,
+        wireguard_client_code: Optional[str] = None,
+        network_endpoint_code: Optional[str] = None,
     ) -> WireguardClientConfigurationSchema:
         """
         Retrieve the full WireGuard client configuration.
+        Provide either wireguard_client_code OR network_endpoint_code.
         """
+        params: PayloadType = {}
+        if wireguard_client_code is not None:
+            params["wireguard_client_code"] = wireguard_client_code
+        if network_endpoint_code is not None:
+            params["network_endpoint_code"] = network_endpoint_code
         r = self._client.request(
             f"{self._path}/wireguard/client/configuration",
             "GET",
-            params={
-                "network_endpoint_code": network_endpoint_code,
-                "interface_code": interface_code,
-            },
+            params=params,
         )
         return WireguardClientConfigurationSchema.model_validate_json(r.text)
 
     # --- WireGuard Server Information ---
-    def get_wireguard_server_config_version(self, interface_code: str) -> float:
+    def get_wireguard_server_config_version(self) -> Optional[float]:
         """
-        Get the current configuration version timestamp for a WireGuard interface.
+        Get the current configuration version timestamp for the WireGuard server.
+        Returns None if not set.
         """
         r = self._client.request(
             f"{self._path}/wireguard/server/config-version",
             "GET",
-            params={"interface_code": interface_code},
         )
-        return float(r.text)
+        return r.json()
 
-    def get_wireguard_server_version(self, interface_code: str) -> str:
+    def get_wireguard_server_version(self) -> Optional[float]:
         """
-        Get the WireGuard server version for an interface.
+        Get the WireGuard server version timestamp.
+        Returns None if not set.
         """
         r = self._client.request(
             f"{self._path}/wireguard/server/server-version",
             "GET",
-            params={"interface_code": interface_code},
         )
-        return r.text.strip('"')
+        return r.json()
 
     def get_wireguard_server_stats(
-        self, interface_code: str
-    ) -> WireguardServerStatsSchema:
+        self,
+    ) -> Optional[List[WireguardServerStatsSchema]]:
         """
-        Get statistics for a WireGuard server interface.
+        Get statistics for all WireGuard server interfaces.
+        Returns None if not available. Requires *:* ACL permissions.
         """
         r = self._client.request(
             f"{self._path}/wireguard/server/stats",
             "GET",
-            params={"interface_code": interface_code},
         )
-        return WireguardServerStatsSchema.model_validate_json(r.text)
+        return r.json()
