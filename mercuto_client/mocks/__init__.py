@@ -7,27 +7,35 @@ from ..client import MercutoClient
 
 
 @contextlib.contextmanager
-def mock_mercuto(data: bool = True,
-                 identity: bool = True,
-                 fatigue: bool = True,
-                 core: bool = True,
-                 media: bool = True,
-                 notifications: bool = True,
-                 verify_service_token: Optional[Callable[[str], VerifyMyPermissions]] = None) -> Iterator[None]:
+def mock_mercuto(
+    data: bool = True,
+    identity: bool = True,
+    fatigue: bool = True,
+    core: bool = True,
+    media: bool = True,
+    notifications: bool = True,
+    endpoint: bool = True,
+    verify_service_token: Optional[Callable[[str], VerifyMyPermissions]] = None,
+) -> Iterator[None]:
     """
     While this context is active, all calls to MercutoClient will use mocked services.
 
     :param data: Whether to mock the data module.
     :param identity: Whether to mock the identity module.
     :param fatigue: Whether to mock the fatigue module.
+    :param core: Whether to mock the core module.
+    :param media: Whether to mock the media module.
+    :param notifications: Whether to mock the notifications module.
+    :param endpoint: Whether to mock the endpoint module.
     :param verify_service_token: Optional function to mock the verify_service_token behavior. Only used for the mock identity service.
     """
     with contextlib.ExitStack() as stack:
         if data:
             stack.enter_context(mock_data_module())
         if identity:
-            stack.enter_context(mock_identity_module(
-                verify_service_token=verify_service_token))
+            stack.enter_context(
+                mock_identity_module(verify_service_token=verify_service_token)
+            )
         if fatigue:
             stack.enter_context(mock_fatigue_module())
         if core:
@@ -36,12 +44,15 @@ def mock_mercuto(data: bool = True,
             stack.enter_context(mock_media_module())
         if notifications:
             stack.enter_context(mock_notifications_module())
+        if endpoint:
+            stack.enter_context(mock_endpoint_module())
         yield
 
 
 @contextlib.contextmanager
 def mock_core_module() -> Iterator[None]:
     from .mock_core import MockMercutoCoreService
+
     original = MercutoClient.core
 
     _cache: Optional[MockMercutoCoreService] = None
@@ -54,15 +65,16 @@ def mock_core_module() -> Iterator[None]:
         return _cache
 
     try:
-        setattr(MercutoClient, 'core', stub)
+        setattr(MercutoClient, "core", stub)
         yield
     finally:
-        setattr(MercutoClient, 'core', original)
+        setattr(MercutoClient, "core", original)
 
 
 @contextlib.contextmanager
 def mock_data_module() -> Iterator[None]:
     from .mock_data import MockMercutoDataService
+
     original = MercutoClient.data
 
     _cache: Optional[MockMercutoDataService] = None
@@ -75,15 +87,18 @@ def mock_data_module() -> Iterator[None]:
         return _cache
 
     try:
-        setattr(MercutoClient, 'data', stub)
+        setattr(MercutoClient, "data", stub)
         yield
     finally:
-        setattr(MercutoClient, 'data', original)
+        setattr(MercutoClient, "data", original)
 
 
 @contextlib.contextmanager
-def mock_identity_module(verify_service_token: Optional[Callable[[str], VerifyMyPermissions]] = None) -> Iterator[None]:
+def mock_identity_module(
+    verify_service_token: Optional[Callable[[str], VerifyMyPermissions]] = None,
+) -> Iterator[None]:
     from .mock_identity import MockMercutoIdentityService
+
     original = MercutoClient.identity
 
     _cache: Optional[MockMercutoIdentityService] = None
@@ -92,20 +107,22 @@ def mock_identity_module(verify_service_token: Optional[Callable[[str], VerifyMy
         nonlocal _cache
         if _cache is None:
             _cache = MockMercutoIdentityService(
-                self, verify_service_token=verify_service_token)
+                self, verify_service_token=verify_service_token
+            )
         _cache._client = self
         return _cache
 
     try:
-        setattr(MercutoClient, 'identity', stub)
+        setattr(MercutoClient, "identity", stub)
         yield
     finally:
-        setattr(MercutoClient, 'identity', original)
+        setattr(MercutoClient, "identity", original)
 
 
 @contextlib.contextmanager
 def mock_fatigue_module() -> Iterator[None]:
     from .mock_fatigue import MockMercutoFatigueService
+
     original = MercutoClient.fatigue
 
     _cache: Optional[MockMercutoFatigueService] = None
@@ -118,15 +135,16 @@ def mock_fatigue_module() -> Iterator[None]:
         return _cache
 
     try:
-        setattr(MercutoClient, 'fatigue', stub)
+        setattr(MercutoClient, "fatigue", stub)
         yield
     finally:
-        setattr(MercutoClient, 'fatigue', original)
+        setattr(MercutoClient, "fatigue", original)
 
 
 @contextlib.contextmanager
 def mock_media_module() -> Iterator[None]:
     from .mock_media import MockMercutoMediaService
+
     original = MercutoClient.media
 
     _cache: Optional[MockMercutoMediaService] = None
@@ -139,15 +157,16 @@ def mock_media_module() -> Iterator[None]:
         return _cache
 
     try:
-        setattr(MercutoClient, 'media', stub)
+        setattr(MercutoClient, "media", stub)
         yield
     finally:
-        setattr(MercutoClient, 'media', original)
+        setattr(MercutoClient, "media", original)
 
 
 @contextlib.contextmanager
 def mock_notifications_module() -> Iterator[None]:
     from .mock_notifications import MockMercutoNotificationService
+
     original = MercutoClient.notifications
 
     _cache: Optional[MockMercutoNotificationService] = None
@@ -160,7 +179,29 @@ def mock_notifications_module() -> Iterator[None]:
         return _cache
 
     try:
-        setattr(MercutoClient, 'notifications', stub)
+        setattr(MercutoClient, "notifications", stub)
         yield
     finally:
-        setattr(MercutoClient, 'notifications', original)
+        setattr(MercutoClient, "notifications", original)
+
+
+@contextlib.contextmanager
+def mock_endpoint_module() -> Iterator[None]:
+    from .mock_endpoint import MockMercutoEndpointService
+
+    original = MercutoClient.endpoint
+
+    _cache: Optional[MockMercutoEndpointService] = None
+
+    def stub(self: MercutoClient) -> MockMercutoEndpointService:
+        nonlocal _cache
+        if _cache is None:
+            _cache = MockMercutoEndpointService(self)
+        _cache._client = self
+        return _cache
+
+    try:
+        setattr(MercutoClient, "endpoint", stub)
+        yield
+    finally:
+        setattr(MercutoClient, "endpoint", original)

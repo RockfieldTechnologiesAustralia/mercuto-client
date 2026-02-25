@@ -15,7 +15,7 @@ from .exceptions import MercutoClientException, MercutoHTTPException
 from .modules.alerts import MercutoAlertService
 from .modules.core import MercutoCoreService
 from .modules.data import MercutoDataService
-from .modules.devices import MercutoDevicesService
+from .modules.endpoint import MercutoEndpointService
 from .modules.fatigue import MercutoFatigueService
 from .modules.identity import MercutoIdentityService
 from .modules.media import MercutoMediaService
@@ -201,6 +201,9 @@ class MercutoClient:
 
     def notifications(self) -> 'MercutoNotificationService':
         return self._add_and_fetch_module('notifications', MercutoNotificationService)
+
+    def endpoint(self) -> 'MercutoEndpointService':
+        return self._add_and_fetch_module("endpoint", MercutoEndpointService)
 
     def alerts(self) -> 'MercutoAlertService':
         return self._add_and_fetch_module('alerts', MercutoAlertService)
