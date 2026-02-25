@@ -5,14 +5,14 @@ from typing import Dict, List, Optional, Union
 
 from ..client import MercutoClient
 from ..exceptions import MercutoHTTPException
-from ..modules.endpoint import (DeviceStatsSchema, MercutoEndpointService,
-                                NetworkEndpointSchema,
+from ..modules.endpoint import (DeviceStatsSchema, Healthcheck,
+                                MercutoEndpointService, NetworkEndpointSchema,
                                 NetworkEndpointTypeOutSchema, PeerStatsSchema,
                                 SSHKeyPair, SSHPublicKeySchema,
                                 WireguardClientConfigurationSchema,
                                 WireguardClientSchema,
                                 WireguardInterfaceSchema, WireguardKeyPair,
-                                WireguardServerStatsSchema, Healthcheck)
+                                WireguardServerStatsSchema)
 from ._utility import EnforceOverridesMeta
 
 logger = logging.getLogger(__name__)
