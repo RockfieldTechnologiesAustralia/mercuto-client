@@ -12,7 +12,7 @@ from ..modules.endpoint import (DeviceStatsSchema, MercutoEndpointService,
                                 WireguardClientConfigurationSchema,
                                 WireguardClientSchema,
                                 WireguardInterfaceSchema, WireguardKeyPair,
-                                WireguardServerStatsSchema)
+                                WireguardServerStatsSchema, Healthcheck)
 from ._utility import EnforceOverridesMeta
 
 logger = logging.getLogger(__name__)
@@ -33,8 +33,8 @@ class MockMercutoEndpointService(
         self._wireguard_interfaces: Dict[str, WireguardInterfaceSchema] = {}
         self._wireguard_clients: Dict[str, WireguardClientSchema] = {}
 
-    def healthcheck(self) -> dict:
-        return {"status": "ok"}
+    def healthcheck(self) -> Healthcheck:
+        return Healthcheck(status='ok')
 
     # --- Network Endpoint Types ---
     def list_network_endpoint_types(
