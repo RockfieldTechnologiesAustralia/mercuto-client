@@ -1,26 +1,19 @@
 import logging
 import secrets
 import uuid
-from dataclasses import dataclass
 from typing import Dict, List, Optional, Union
 
+from ._utility import EnforceOverridesMeta
 from ..client import MercutoClient
 from ..exceptions import MercutoHTTPException
-from ..modules.endpoint import (
-    DeviceStatsSchema,
-    MercutoEndpointService,
-    NetworkEndpointSchema,
-    NetworkEndpointTypeOutSchema,
-    PeerStatsSchema,
-    SSHKeyPair,
-    SSHPublicKeySchema,
-    WireguardClientConfigurationSchema,
-    WireguardClientSchema,
-    WireguardInterfaceSchema,
-    WireguardKeyPair,
-    WireguardServerStatsSchema,
-)
-from ._utility import EnforceOverridesMeta
+from ..modules.endpoint import (DeviceStatsSchema, MercutoEndpointService,
+                                NetworkEndpointSchema,
+                                NetworkEndpointTypeOutSchema, PeerStatsSchema,
+                                SSHKeyPair, SSHPublicKeySchema,
+                                WireguardClientConfigurationSchema,
+                                WireguardClientSchema,
+                                WireguardInterfaceSchema, WireguardKeyPair,
+                                WireguardServerStatsSchema)
 
 logger = logging.getLogger(__name__)
 
@@ -50,7 +43,7 @@ class MockMercutoEndpointService(
         all_types = list(self._network_endpoint_types.values())
         if limit == 0:
             return len(all_types)
-        return all_types[offset : offset + limit]
+        return all_types[offset:offset + limit]
 
     def create_network_endpoint_type(
         self, model: str, manufacturer: str
@@ -73,7 +66,7 @@ class MockMercutoEndpointService(
         ]
         if limit == 0:
             return len(endpoints)
-        return endpoints[offset : offset + limit]
+        return endpoints[offset:offset + limit]
 
     def create_network_endpoint(
         self, network_endpoint_type_code: str, serial_number: str, project_code: str
@@ -97,8 +90,7 @@ class MockMercutoEndpointService(
     ) -> NetworkEndpointSchema:
         for endpoint in self._network_endpoints.values():
             if (
-                endpoint.project_code == project_code
-                and endpoint.serial_number == serial_number
+                endpoint.project_code == project_code and endpoint.serial_number == serial_number
             ):
                 return endpoint
         raise MercutoHTTPException("Network endpoint not found", 404)
@@ -120,7 +112,7 @@ class MockMercutoEndpointService(
         ]
         if limit == 0:
             return len(keys)
-        return keys[offset : offset + limit]
+        return keys[offset: offset + limit]
 
     def create_ssh_public_key(
         self,
@@ -268,8 +260,8 @@ class MockMercutoEndpointService(
     ) -> WireguardClientSchema:
         for client in self._wireguard_clients.values():
             if (
-                client.network_endpoint_code == network_endpoint_code
-                and client.interface_code == interface_code
+                client.network_endpoint_code == network_endpoint_code and  # noqa: W504
+                client.interface_code == interface_code
             ):
                 return client
         raise MercutoHTTPException("WireGuard client not found", 404)
@@ -279,8 +271,8 @@ class MockMercutoEndpointService(
     ) -> None:
         for code, client in list(self._wireguard_clients.items()):
             if (
-                client.network_endpoint_code == network_endpoint_code
-                and client.interface_code == interface_code
+                client.network_endpoint_code == network_endpoint_code and  # noqa: W504
+                client.interface_code == interface_code
             ):
                 del self._wireguard_clients[code]
                 return

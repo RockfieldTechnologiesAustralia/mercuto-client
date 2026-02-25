@@ -55,7 +55,8 @@ def simple_ftp_server(directory: str,
     """
 
     if clock is None:
-        def clock(): return datetime.now(timezone.utc)
+        def clock():
+            return datetime.now(timezone.utc)
 
     def rename_file(file_path: str) -> str:
         """

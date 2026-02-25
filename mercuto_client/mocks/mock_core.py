@@ -73,7 +73,7 @@ class MockMercutoCoreService(MercutoCoreService, metaclass=EnforceOverridesMeta)
         return filtered
 
     def list_devices(self, project_code: str, limit: int, offset: int) -> list[Device]:
-        return [device for device in self._devices.values() if device.project.code == project_code][offset:offset+limit]
+        return [device for device in self._devices.values() if device.project.code == project_code][offset:offset + limit]
 
     def get_device(self, device_code: str) -> Device:
         if device_code not in self._devices:

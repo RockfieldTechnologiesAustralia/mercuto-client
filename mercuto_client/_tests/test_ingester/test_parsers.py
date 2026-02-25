@@ -72,7 +72,7 @@ def test_campbells_parser():
         "Diag_Max(2)": "ffffffff",
     }
     samples = parse_campbell_file(file, mapper)
-    assert len(samples) == 6*4
+    assert len(samples) == 6 * 4
 
     assert samples[0].channel == "aaaaaaaa"
     assert math.isclose(samples[0].value, 1234.5)
@@ -87,7 +87,7 @@ def test_campbells_parser():
     assert math.isclose(samples[6].value, 1234.5)
     assert samples[6].timestamp.isoformat() == '2023-12-07T00:02:00'
     for i in range(7, 12):
-        assert samples[i].channel == list(mapper.values())[i-6]
+        assert samples[i].channel == list(mapper.values())[i - 6]
         assert math.isnan(samples[i].value)
         assert samples[i].timestamp.isoformat() == '2023-12-07T00:02:00'
 
@@ -99,7 +99,7 @@ def test_campbells_parser():
     assert samples[13].timestamp.isoformat() == '2023-12-07T00:03:00'
 
     for i in range(15, 17):
-        assert samples[i].channel == list(mapper.values())[i-12]
+        assert samples[i].channel == list(mapper.values())[i - 12]
         assert math.isnan(samples[i].value)
         assert samples[i].timestamp.isoformat() == '2023-12-07T00:03:00'
     assert samples[17].channel == "ffffffff"

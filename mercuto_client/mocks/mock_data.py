@@ -164,7 +164,7 @@ class MockMercutoDataService(MercutoDataService, metaclass=EnforceOverridesMeta)
 
             # Filter by time range
             buffer = buffer[
-                (buffer.index.get_level_values('timestamp') >= start_time) &
+                (buffer.index.get_level_values('timestamp') >= start_time) &  # noqa: W504
                 (buffer.index.get_level_values('timestamp') <= end_time)
             ]
             return buffer
@@ -253,9 +253,9 @@ class MockMercutoDataService(MercutoDataService, metaclass=EnforceOverridesMeta)
 
         # Ensure all channels are of type METRIC
         if not all(
-            sample.channel in self._channels and (self._channels[sample.channel].classification == ChannelClassification.EVENT_METRIC or
-                                                  self._channels[sample.channel].classification == ChannelClassification.PRIMARY_EVENT_AGGREGATE)
-            and self._channels[sample.channel].project == project
+            sample.channel in self._channels and (self._channels[sample.channel].classification == ChannelClassification.EVENT_METRIC or  # noqa: W504
+                                                  self._channels[sample.channel].classification == ChannelClassification.PRIMARY_EVENT_AGGREGATE) and  # noqa: W504
+            self._channels[sample.channel].project == project
             for sample in samples
         ):
             return
@@ -287,8 +287,8 @@ class MockMercutoDataService(MercutoDataService, metaclass=EnforceOverridesMeta)
 
         # Ensure all channels are of type SECONDARY
         if not all(
-            sample.channel in self._channels and self._channels[sample.channel].classification == ChannelClassification.SECONDARY
-            and self._channels[sample.channel].project == project
+            sample.channel in self._channels and self._channels[sample.channel].classification == ChannelClassification.SECONDARY and  # noqa: W504
+            self._channels[sample.channel].project == project
             for sample in samples
         ):
             return
@@ -315,7 +315,7 @@ class MockMercutoDataService(MercutoDataService, metaclass=EnforceOverridesMeta)
         idx = self._metric_buffer.index
 
         mask = (
-            idx.get_level_values('channel').isin(channels) &
+            idx.get_level_values('channel').isin(channels) &  # noqa: W504
             (self._metric_buffer['event'] == event)
         )
         self._metric_buffer = self._metric_buffer[~mask]
@@ -348,9 +348,9 @@ class MockMercutoDataService(MercutoDataService, metaclass=EnforceOverridesMeta)
 
         idx = self._metric_buffer.index
         mask = (
-            idx.get_level_values('channel').isin(channels) &
-            (start_time is None or idx.get_level_values('timestamp') >= start_time) &
-            (end_time is None or idx.get_level_values('timestamp') <= end_time) &
+            idx.get_level_values('channel').isin(channels) &  # noqa: W504
+            (start_time is None or idx.get_level_values('timestamp') >= start_time) &  # noqa: W504
+            (end_time is None or idx.get_level_values('timestamp') <= end_time) &  # noqa: W504
             (events is None or self._metric_buffer['event'].isin(events))
         )
         filtered = self._metric_buffer[mask]
@@ -373,8 +373,8 @@ class MockMercutoDataService(MercutoDataService, metaclass=EnforceOverridesMeta)
     ) -> list[SecondaryDataSample]:
         idx = self._secondary_and_primary_buffer.index
         mask = (
-            idx.get_level_values('channel').isin(channels) &
-            (idx.get_level_values('timestamp') >= start_time) &
+            idx.get_level_values('channel').isin(channels) &  # noqa: W504
+            (idx.get_level_values('timestamp') >= start_time) &  # noqa: W504
             (idx.get_level_values('timestamp') <= end_time)
         )
         filtered = self._secondary_and_primary_buffer[mask]
@@ -442,8 +442,7 @@ class MockMercutoDataService(MercutoDataService, metaclass=EnforceOverridesMeta)
         if include_primary:
             channels = [c.code for c in self._channels.values() if c.project == project]
         else:
-            channels = [ch for ch in channels if self._channels[ch].classification !=
-                        ChannelClassification.PRIMARY and self._channels[ch].project == project]
+            channels = [ch for ch in channels if self._channels[ch].classification != ChannelClassification.PRIMARY and self._channels[ch].project == project]
 
         out: list[LatestDataSample] = []
 

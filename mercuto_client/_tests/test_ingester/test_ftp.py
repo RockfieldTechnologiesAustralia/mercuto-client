@@ -9,7 +9,9 @@ from ...ingester.ftp import simple_ftp_server
 
 def test_simple_ftp_server():
     receives = []
-    def clock(): return datetime(2023, 10, 1, 12, 0, 0, tzinfo=timezone.utc)
+
+    def clock():
+        return datetime(2023, 10, 1, 12, 0, 0, tzinfo=timezone.utc)
 
     with tempfile.TemporaryDirectory() as temp_dir:
         with simple_ftp_server(directory=temp_dir,

@@ -397,7 +397,7 @@ class MercutoCoreService:
             json['lower_inclusive_bound'] = lower_bound
         if upper_bound is not None:
             json['upper_exclusive_bound'] = upper_bound
-        r = self._client.request('/alerts/conditions', 'PUT',  json=json)
+        r = self._client.request('/alerts/conditions', 'PUT', json=json)
         return Condition.model_validate_json(r.text)
 
     def create_alert_configuration(self, label: str,
@@ -463,7 +463,7 @@ class MercutoCoreService:
             'manufacturer': manufacturer,
             'model_number': model_number
         }
-        r = self._client.request('/devices/types', 'PUT',  json=json)
+        r = self._client.request('/devices/types', 'PUT', json=json)
         return DeviceType.model_validate_json(r.text)
 
     def list_devices(self, project_code: str, limit: int, offset: int) -> list[Device]:

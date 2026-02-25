@@ -51,7 +51,7 @@ def _parse_csv_line(line: str, sep: str = ',', timestamp_index: int = 0) -> tupl
         raise ValueError(
             f"Failed to parse timestamp: {timestamp} - {e}") from e
     # Rest are values
-    return dt, [_clean_number(v) for v in values[timestamp_index+1:]]
+    return dt, [_clean_number(v) for v in values[timestamp_index + 1:]]
 
 
 def parse_generic_csv_file(filename: str, label_to_channel_code: dict[str, str],
