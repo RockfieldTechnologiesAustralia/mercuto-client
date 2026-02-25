@@ -254,7 +254,7 @@ class MockMercutoDataService(MercutoDataService, metaclass=EnforceOverridesMeta)
         # Ensure all channels are of type METRIC
         if not all(
             sample.channel in self._channels and (self._channels[sample.channel].classification == ChannelClassification.EVENT_METRIC or  # noqa: W504
-                                                  self._channels[sample.channel].classification == ChannelClassification.PRIMARY_EVENT_AGGREGATE) and  # noqa: W504
+                                                  self._channels[sample.channel].classification == ChannelClassification.PRIMARY_EVENT_AGGREGATE) and
             self._channels[sample.channel].project == project
             for sample in samples
         ):
@@ -442,7 +442,8 @@ class MockMercutoDataService(MercutoDataService, metaclass=EnforceOverridesMeta)
         if include_primary:
             channels = [c.code for c in self._channels.values() if c.project == project]
         else:
-            channels = [ch for ch in channels if self._channels[ch].classification != ChannelClassification.PRIMARY and self._channels[ch].project == project]
+            channels = [ch for ch in channels if self._channels[ch].classification != ChannelClassification.PRIMARY and  # noqa: W504
+                        self._channels[ch].project == project]
 
         out: list[LatestDataSample] = []
 
