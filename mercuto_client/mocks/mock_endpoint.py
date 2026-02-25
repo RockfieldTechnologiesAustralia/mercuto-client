@@ -3,7 +3,6 @@ import secrets
 import uuid
 from typing import Dict, List, Optional, Union
 
-from ._utility import EnforceOverridesMeta
 from ..client import MercutoClient
 from ..exceptions import MercutoHTTPException
 from ..modules.endpoint import (DeviceStatsSchema, MercutoEndpointService,
@@ -14,6 +13,7 @@ from ..modules.endpoint import (DeviceStatsSchema, MercutoEndpointService,
                                 WireguardClientSchema,
                                 WireguardInterfaceSchema, WireguardKeyPair,
                                 WireguardServerStatsSchema)
+from ._utility import EnforceOverridesMeta
 
 logger = logging.getLogger(__name__)
 
