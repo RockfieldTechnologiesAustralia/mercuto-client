@@ -202,9 +202,6 @@ class MercutoClient:
     def notifications(self) -> 'MercutoNotificationService':
         return self._add_and_fetch_module('notifications', MercutoNotificationService)
 
-    def devices(self) -> 'MercutoDevicesService':
-        return self._add_and_fetch_module('devices', MercutoDevicesService)
-
     def alerts(self) -> 'MercutoAlertService':
         return self._add_and_fetch_module('alerts', MercutoAlertService)
 
