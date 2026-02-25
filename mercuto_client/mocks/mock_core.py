@@ -23,7 +23,7 @@ class MockMercutoCoreService(MercutoCoreService, metaclass=EnforceOverridesMeta)
     def ping_project(self, project: str, ip_address: str) -> None:
         if project not in self._projects:
             raise MercutoHTTPException(status_code=404, message=f"Project {project} not found")
-        
+
         self._projects[project].status.last_ping = datetime.now(py_timezone.utc).isoformat()
         self._projects[project].status.ip_address = ip_address
 
