@@ -5,14 +5,23 @@ from typing import Dict, List, Optional, Union
 
 from ..client import MercutoClient
 from ..exceptions import MercutoHTTPException
-from ..modules.endpoint import (DeviceStatsSchema, Healthcheck,
-                                MercutoEndpointService, NetworkEndpointSchema,
-                                NetworkEndpointTypeOutSchema, PeerStatsSchema,
-                                SSHKeyPair, SSHPublicKeySchema,
-                                WireguardClientConfigurationSchema,
-                                WireguardClientSchema,
-                                WireguardInterfaceSchema, WireguardKeyPair,
-                                WireguardServerStatsSchema)
+from ..modules.endpoint import (
+    DeviceStatsSchema,
+    Ed25519Algorithm,
+    Healthcheck,
+    MercutoEndpointService,
+    NetworkEndpointSchema,
+    NetworkEndpointTypeOutSchema,
+    PeerStatsSchema,
+    RSAAlgorithm,
+    SSHKeyPair,
+    SSHPublicKeySchema,
+    WireguardClientConfigurationSchema,
+    WireguardClientSchema,
+    WireguardInterfaceSchema,
+    WireguardKeyPair,
+    WireguardServerStatsSchema,
+)
 from ._utility import EnforceOverridesMeta
 
 logger = logging.getLogger(__name__)
@@ -34,7 +43,7 @@ class MockMercutoEndpointService(
         self._wireguard_clients: Dict[str, WireguardClientSchema] = {}
 
     def healthcheck(self) -> Healthcheck:
-        return Healthcheck(status='ok')
+        return Healthcheck(status="ok")
 
     # --- Network Endpoint Types ---
     def list_network_endpoint_types(
@@ -86,18 +95,31 @@ class MockMercutoEndpointService(
         return endpoint
 
     def get_network_endpoint(
-        self, project_code: str, serial_number: str
+        self,
+        network_endpoint_code: Optional[str] = None,
+        serial_number: Optional[str] = None,
     ) -> NetworkEndpointSchema:
         for endpoint in self._network_endpoints.values():
             if (
-                endpoint.project_code == project_code and endpoint.serial_number == serial_number
+                network_endpoint_code is not None
+                and endpoint.code == network_endpoint_code
             ):
+                return endpoint
+            if serial_number is not None and endpoint.serial_number == serial_number:
                 return endpoint
         raise MercutoHTTPException("Network endpoint not found", 404)
 
     # --- SSH Key Management ---
-    def generate_ssh_keys(self, name: str) -> SSHKeyPair:
+    def generate_ssh_keys(
+        self, algorithm: Union[RSAAlgorithm, Ed25519Algorithm]
+    ) -> SSHKeyPair:
         # Generate mock SSH keys
+        if isinstance(algorithm, RSAAlgorithm):
+            key_size = algorithm.params.key_size if algorithm.params else 4096
+            name = f"rsa-{key_size}"
+        else:
+            name = "ed25519"
+
         private_key = f"-----BEGIN OPENSSH PRIVATE KEY-----\n{secrets.token_urlsafe(64)}\n-----END OPENSSH PRIVATE KEY-----"
         public_key = f"ssh-ed25519 {secrets.token_urlsafe(43)} {name}"
         return SSHKeyPair(name=name, public_key=public_key, private_key=private_key)
@@ -112,35 +134,44 @@ class MockMercutoEndpointService(
         ]
         if limit == 0:
             return len(keys)
-        return keys[offset: offset + limit]
+        return keys[offset:offset + limit]
 
     def create_ssh_public_key(
         self,
         network_endpoint_code: str,
         public_key: str,
-        port: int,
-        comment: Optional[str] = None,
     ) -> SSHPublicKeySchema:
         if network_endpoint_code not in self._network_endpoints:
             raise MercutoHTTPException("Network endpoint not found", 404)
 
         code = str(uuid.uuid4())
         endpoint = self._network_endpoints[network_endpoint_code]
+
+        # Use default port 22 for mock
+        port = 22
+
         ssh_key = SSHPublicKeySchema(
             code=code,
             network_endpoint=endpoint,
             public_key=public_key,
             port=port,
-            comment=comment,
+            comment=None,
         )
         self._ssh_public_keys[code] = ssh_key
         return ssh_key
 
     def get_ssh_public_key(
-        self, network_endpoint_code: str, port: int
+        self,
+        network_endpoint_code: Optional[str] = None,
+        ssh_public_key_code: Optional[str] = None,
     ) -> SSHPublicKeySchema:
         for key in self._ssh_public_keys.values():
-            if key.network_endpoint.code == network_endpoint_code and key.port == port:
+            if ssh_public_key_code is not None and key.code == ssh_public_key_code:
+                return key
+            if (
+                network_endpoint_code is not None
+                and key.network_endpoint.code == network_endpoint_code
+            ):
                 return key
         raise MercutoHTTPException("SSH public key not found", 404)
 
@@ -155,10 +186,6 @@ class MockMercutoEndpointService(
     def create_wireguard_interface(
         self,
         interface_name: str,
-        port: int,
-        subnet: int,
-        bits: int,
-        hostname: str,
         tenant_code: Optional[str] = None,
         isolation_group_code: Optional[str] = None,
         private_key: Optional[str] = None,
@@ -174,7 +201,11 @@ class MockMercutoEndpointService(
             if public_key is None:
                 public_key = keys.public_key
 
-        # Calculate IP address from subnet and bits
+        # Mock defaults for required fields
+        port = 51820
+        subnet = 10
+        bits = 24
+        hostname = "localhost"
         ip_address = f"{subnet}.0.0.1/{bits}"
 
         interface = WireguardInterfaceSchema(
@@ -194,12 +225,22 @@ class MockMercutoEndpointService(
         self._wireguard_interfaces[code] = interface
         return interface
 
-    def get_wireguard_interface(self, interface_code: str) -> WireguardInterfaceSchema:
-        if interface_code not in self._wireguard_interfaces:
-            raise MercutoHTTPException("WireGuard interface not found", 404)
-        return self._wireguard_interfaces[interface_code]
+    def get_wireguard_interface(
+        self,
+        interface_code: Optional[str] = None,
+        tenant_code: Optional[str] = None,
+    ) -> WireguardInterfaceSchema:
+        for interface in self._wireguard_interfaces.values():
+            if interface_code is not None and interface.code == interface_code:
+                return interface
+            if tenant_code is not None and interface.tenant_code == tenant_code:
+                return interface
+        raise MercutoHTTPException("WireGuard interface not found", 404)
 
-    def delete_wireguard_interface(self, interface_code: str) -> None:
+    def delete_wireguard_interface(self, interface_code: Optional[str] = None) -> bool:
+        if interface_code is None:
+            raise MercutoHTTPException("interface_code is required", 400)
+
         if interface_code not in self._wireguard_interfaces:
             raise MercutoHTTPException("WireGuard interface not found", 404)
 
@@ -213,22 +254,30 @@ class MockMercutoEndpointService(
             del self._wireguard_clients[code]
 
         del self._wireguard_interfaces[interface_code]
+        return True
 
     # --- WireGuard Client Management ---
     def register_wireguard_client(
         self,
-        interface_code: str,
         network_endpoint_code: str,
         public_key: str,
-        allowed_ips: str,
-        description: Optional[str] = None,
+        allowed_ips: str = "",
     ) -> WireguardClientSchema:
-        if interface_code not in self._wireguard_interfaces:
-            raise MercutoHTTPException("WireGuard interface not found", 404)
         if network_endpoint_code not in self._network_endpoints:
             raise MercutoHTTPException("Network endpoint not found", 404)
 
-        interface = self._wireguard_interfaces[interface_code]
+        # Find interface for this network endpoint (via project/tenant)
+        # For mock, just use first available interface
+        interface = None
+        for iface in self._wireguard_interfaces.values():
+            # Match by tenant or just use first available for mock
+            interface = iface
+            break
+
+        if interface is None:
+            raise MercutoHTTPException("No WireGuard interface available", 404)
+
+        interface_code = interface.code
 
         # Generate client ID (simple incremental based on existing clients)
         existing_clients = [
@@ -250,44 +299,65 @@ class MockMercutoEndpointService(
             allowed_ips=allowed_ips,
             interface_code=interface_code,
             network_endpoint_code=network_endpoint_code,
-            description=description,
+            description=None,
         )
         self._wireguard_clients[code] = client
         return client
 
     def get_wireguard_client(
-        self, network_endpoint_code: str, interface_code: str
+        self,
+        network_endpoint_code: Optional[str] = None,
+        wireguard_client_code: Optional[str] = None,
     ) -> WireguardClientSchema:
         for client in self._wireguard_clients.values():
             if (
-                client.network_endpoint_code == network_endpoint_code and  # noqa: W504
-                client.interface_code == interface_code
+                wireguard_client_code is not None
+                and client.code == wireguard_client_code
+            ):
+                return client
+            if (
+                network_endpoint_code is not None
+                and client.network_endpoint_code == network_endpoint_code
             ):
                 return client
         raise MercutoHTTPException("WireGuard client not found", 404)
 
     def delete_wireguard_client(
-        self, network_endpoint_code: str, interface_code: str
-    ) -> None:
+        self,
+        network_endpoint_code: Optional[str] = None,
+        wireguard_client_code: Optional[str] = None,
+    ) -> bool:
         for code, client in list(self._wireguard_clients.items()):
             if (
-                client.network_endpoint_code == network_endpoint_code and  # noqa: W504
-                client.interface_code == interface_code
+                wireguard_client_code is not None
+                and client.code == wireguard_client_code
             ):
                 del self._wireguard_clients[code]
-                return
+                return True
+            if (
+                network_endpoint_code is not None
+                and client.network_endpoint_code == network_endpoint_code
+            ):
+                del self._wireguard_clients[code]
+                return True
         raise MercutoHTTPException("WireGuard client not found", 404)
 
     def get_wireguard_client_configuration(
-        self, network_endpoint_code: str, interface_code: str
+        self,
+        wireguard_client_code: Optional[str] = None,
+        network_endpoint_code: Optional[str] = None,
     ) -> WireguardClientConfigurationSchema:
-        client = self.get_wireguard_client(network_endpoint_code, interface_code)
-        interface = self.get_wireguard_interface(interface_code)
+        client = self.get_wireguard_client(
+            network_endpoint_code=network_endpoint_code,
+            wireguard_client_code=wireguard_client_code,
+        )
 
-        if network_endpoint_code not in self._network_endpoints:
+        interface = self.get_wireguard_interface(interface_code=client.interface_code)
+
+        if client.network_endpoint_code not in self._network_endpoints:
             raise MercutoHTTPException("Network endpoint not found", 404)
 
-        endpoint = self._network_endpoints[network_endpoint_code]
+        endpoint = self._network_endpoints[client.network_endpoint_code]
 
         import time
 
@@ -301,57 +371,62 @@ class MockMercutoEndpointService(
         )
 
     # --- WireGuard Server Information ---
-    def get_wireguard_server_config_version(self, interface_code: str) -> float:
-        if interface_code not in self._wireguard_interfaces:
-            raise MercutoHTTPException("WireGuard interface not found", 404)
-
+    def get_wireguard_server_config_version(self) -> Optional[float]:
         import time
 
-        return time.time()
+        # Return current timestamp as config version for mock
+        if len(self._wireguard_interfaces) > 0:
+            return time.time()
+        return None
 
-    def get_wireguard_server_version(self, interface_code: str) -> str:
-        if interface_code not in self._wireguard_interfaces:
-            raise MercutoHTTPException("WireGuard interface not found", 404)
-
-        return "1.0.20210914"
+    def get_wireguard_server_version(self) -> Optional[float]:
+        # Return mock version as float for compatibility
+        if len(self._wireguard_interfaces) > 0:
+            return 1.0
+        return None
 
     def get_wireguard_server_stats(
-        self, interface_code: str
-    ) -> WireguardServerStatsSchema:
-        if interface_code not in self._wireguard_interfaces:
-            raise MercutoHTTPException("WireGuard interface not found", 404)
-
-        interface = self._wireguard_interfaces[interface_code]
-
-        # Create mock peer stats for clients
-        peers: Dict[str, PeerStatsSchema] = {}
-        clients = [
-            c
-            for c in self._wireguard_clients.values()
-            if c.interface_code == interface_code
-        ]
-
-        for client in clients:
-            peers[client.public_key] = PeerStatsSchema(
-                endpoint="(none)",
-                allowed_ips=[client.allowed_ips],
-                latest_handshake="0",
-                transfer_rx="0",
-                transfer_tx="0",
-                persistent_keepalive="off",
-            )
-
-        device_stats = DeviceStatsSchema(
-            public_key=interface.public_key,
-            listen_port=str(interface.port),
-            fwmark="off",
-            peers=peers,
-        )
+        self,
+    ) -> Optional[List[WireguardServerStatsSchema]]:
+        if len(self._wireguard_interfaces) == 0:
+            return None
 
         import time
 
-        timestamp = str(int(time.time()))
+        stats_list = []
 
-        return WireguardServerStatsSchema(
-            timestamp=timestamp, value={interface.interface_name: device_stats}
-        )
+        for interface_code, interface in self._wireguard_interfaces.items():
+            # Create mock peer stats for clients
+            peers: Dict[str, PeerStatsSchema] = {}
+            clients = [
+                c
+                for c in self._wireguard_clients.values()
+                if c.interface_code == interface_code
+            ]
+
+            for client in clients:
+                peers[client.public_key] = PeerStatsSchema(
+                    endpoint="(none)",
+                    allowed_ips=[client.allowed_ips],
+                    latest_handshake="0",
+                    transfer_rx="0",
+                    transfer_tx="0",
+                    persistent_keepalive="off",
+                )
+
+            device_stats = DeviceStatsSchema(
+                public_key=interface.public_key,
+                listen_port=str(interface.port),
+                fwmark="off",
+                peers=peers,
+            )
+
+            timestamp = str(int(time.time()))
+
+            stats_list.append(
+                WireguardServerStatsSchema(
+                    timestamp=timestamp, value={interface.interface_name: device_stats}
+                )
+            )
+
+        return stats_list
