@@ -1,17 +1,11 @@
 from ... import MercutoClient
-from ...modules.endpoint import (
-    Ed25519Algorithm,
-    NetworkEndpointSchema,
-    NetworkEndpointTypeOutSchema,
-    RSAAlgorithm,
-    RSAParams,
-    SSHPublicKeySchema,
-    WireguardClientConfigurationSchema,
-    WireguardClientSchema,
-    WireguardInterfaceSchema,
-    WireguardKeyPair,
-    WireguardServerStatsSchema,
-)
+from ...modules.endpoint import (Ed25519Algorithm, NetworkEndpointSchema,
+                                 NetworkEndpointTypeOutSchema, RSAAlgorithm,
+                                 RSAParams, SSHPublicKeySchema,
+                                 WireguardClientConfigurationSchema,
+                                 WireguardClientSchema,
+                                 WireguardInterfaceSchema, WireguardKeyPair,
+                                 WireguardServerStatsSchema)
 
 
 def test_healthcheck(client: MercutoClient) -> None:
