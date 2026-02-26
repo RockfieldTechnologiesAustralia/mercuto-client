@@ -14,7 +14,6 @@ from ..modules.endpoint import (DeviceStatsSchema, Ed25519Algorithm,
                                 WireguardClientSchema,
                                 WireguardInterfaceSchema, WireguardKeyPair,
                                 WireguardServerStatsSchema)
-
 from ._utility import EnforceOverridesMeta
 
 logger = logging.getLogger(__name__)
