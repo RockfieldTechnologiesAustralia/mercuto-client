@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING, Any, Literal, Optional
 
 from pydantic import AwareDatetime, TypeAdapter
 
-from .data import AggregationInterval, AggregationMethod
+from .data import AggregationMethod
 
 if TYPE_CHECKING:
     from ..client import MercutoClient
@@ -19,7 +19,7 @@ class Healthcheck(BaseModel):
 class Condition(BaseModel):
     class ConditionAggregationOption(BaseModel):
         method: AggregationMethod
-        interval: AggregationInterval
+        interval: timedelta
     code: str
     project: str
     description: Optional[str]

@@ -9,12 +9,12 @@ import pandas as pd
 
 from ..client import MercutoClient
 from ..exceptions import MercutoHTTPException
-from ..modules.data import (AggregationInterval, AggregationMethod,
-                            AggregationOptions, Channel, ChannelClassification,
-                            ChannelFormat, Datatable, DatatableColumn,
-                            FileFormat, FrameFormat, GetStatusRequestResponse,
-                            LatestDataSample, MercutoDataService,
-                            MetricDataSample, SecondaryDataSample, Units)
+from ..modules.data import (AggregationMethod, AggregationOptions, Channel,
+                            ChannelClassification, ChannelFormat, Datatable,
+                            DatatableColumn, FileFormat, FrameFormat,
+                            GetStatusRequestResponse, LatestDataSample,
+                            MercutoDataService, MetricDataSample,
+                            SecondaryDataSample, Units)
 from ._utility import EnforceOverridesMeta
 
 logger = logging.getLogger(__name__)
@@ -180,7 +180,7 @@ class MockMercutoDataService(MercutoDataService, metaclass=EnforceOverridesMeta)
         if aggregation is not None:
             if aggregation.method != AggregationMethod.MEAN:
                 raise NotImplementedError(f"Unsupported aggregation method for MockClient: {aggregation.method}")
-            if aggregation.interval != AggregationInterval.DAY:
+            if aggregation.interval != 'day' and aggregation.interval != timedelta(days=1):
                 raise NotImplementedError(f"Unsupported aggregation interval for MockClient: {aggregation.interval}")
             if not aggregation.rolling:
                 raise NotImplementedError("MockClient only supports rolling aggregation.")

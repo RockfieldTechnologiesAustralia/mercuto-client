@@ -3,7 +3,8 @@ import os
 import time
 from contextlib import nullcontext
 from datetime import datetime, timedelta
-from typing import TYPE_CHECKING, Any, BinaryIO, Collection, Optional, TextIO
+from typing import (TYPE_CHECKING, Any, BinaryIO, Collection, Literal,
+                    Optional, TextIO)
 
 from pydantic import TypeAdapter
 
@@ -117,16 +118,14 @@ class AggregationMethod(enum.Enum):
     SUM = 'sum'
     COUNT = 'count'
     GREATEST = 'greatest'
+    PEAK_TO_PEAK = 'peak-to-peak'
 
 
-class AggregationInterval(enum.Enum):
-    SECOND = 'second'
-    MINUTE = 'minute'
-    HOUR = 'hour'
-    DAY = 'day'
-    WEEK = 'week'
-    MONTH = 'month'
-    YEAR = 'year'
+SHORTHAND_INTERVALS = {'year', 'month',
+                       'week', 'day', 'hour', 'minute', 'second'}
+
+type AggregationInterval = timedelta | Literal['year',
+                                               'month', 'week', 'day', 'hour', 'minute', 'second']
 
 
 class AggregationOptions(BaseModel):
