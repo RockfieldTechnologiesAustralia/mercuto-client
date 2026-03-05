@@ -4,7 +4,7 @@ import time
 from contextlib import nullcontext
 from datetime import datetime, timedelta
 from typing import (TYPE_CHECKING, Any, BinaryIO, Collection, Literal,
-                    Optional, TextIO)
+                    Optional, TextIO, Union)
 
 from pydantic import TypeAdapter
 
@@ -124,8 +124,8 @@ class AggregationMethod(enum.Enum):
 SHORTHAND_INTERVALS = {'year', 'month',
                        'week', 'day', 'hour', 'minute', 'second'}
 
-type AggregationInterval = timedelta | Literal['year',
-                                               'month', 'week', 'day', 'hour', 'minute', 'second']
+AggregationInterval = Union[timedelta, Literal['year',
+                                               'month', 'week', 'day', 'hour', 'minute', 'second']]
 
 
 class AggregationOptions(BaseModel):
