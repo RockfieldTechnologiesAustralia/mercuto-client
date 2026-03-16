@@ -38,9 +38,9 @@ class Condition(BaseModel):
     type: Literal['channel-range', 'channel-offline', 'camera-offline']
 
 
-class AlarmCondition(BaseModel):
-    condition_group: int
-    condition: Condition
+class AlarmConditionGroup(BaseModel):
+    same_target: Literal['none', 'exact', 'effective']
+    conditions: list[Condition]
 
 
 class Alarm(BaseModel):
@@ -50,7 +50,8 @@ class Alarm(BaseModel):
     severity: int
     contact_group: Optional[str]
     check_type: Literal['event', 'interval']
-    conditions: list[AlarmCondition]
+    condition_groups: list[AlarmConditionGroup]
+    minimum_unique_targets: int
 
 
 class ConditionLog(BaseModel):
