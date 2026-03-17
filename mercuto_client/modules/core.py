@@ -32,6 +32,9 @@ class Project(BaseModel):
 
 class WidgetConfig(BaseModel):
     type: str
+    title: Optional[str]
+    icon: Optional[str]
+    transparent: Optional[bool]
     config: dict[Any, Any]
 
 
@@ -42,7 +45,7 @@ class WidgetColumn(BaseModel):
 
 class WidgetRow(BaseModel):
     columns: list[WidgetColumn]
-    height: int
+    height: Optional[int]
     title: str
     breakpoint: Optional[str]
 
