@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, Any, Literal, Optional
 from pydantic import TypeAdapter
 
 from . import PayloadType
-from ._util import BaseModel, serialise_timedelta
+from ._util import _UNSET, BaseModel, serialise_timedelta
 
 if TYPE_CHECKING:
     from ..client import MercutoClient
@@ -191,6 +191,10 @@ class DeviceChannel(BaseModel):
     field: str
 
 
+class DeviceMeta(BaseModel):
+    notes: Optional[str] = None
+
+
 class Device(BaseModel):
     code: str
     project: ItemCode
@@ -199,6 +203,10 @@ class Device(BaseModel):
     device_type: DeviceType
     groups: list[str]
     channels: list[DeviceChannel]
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    altitude: Optional[float] = None
+    meta: Optional[DeviceMeta] = None
 
 
 class DeviceGroup(BaseModel):
@@ -512,3 +520,27 @@ class MercutoCoreService:
     def list_device_groups(self, project: str) -> list[DeviceGroup]:
         r = self._client.request('/devices/groups', 'GET', params={'project_code': project})
         return _DeviceGroupListAdapter.validate_json(r.text)
+
+    def get_device_meta(self, device_code: str) -> DeviceMeta:
+        r = self._client.request(f'/devices/{device_code}/meta', 'GET')
+        return DeviceMeta.model_validate_json(r.text)
+
+    def set_device_meta(self, device_code: str, notes: Optional[str] = None) -> DeviceMeta:
+        json: PayloadType = {'notes': notes}
+        r = self._client.request(f'/devices/{device_code}/meta', 'PUT', json=json)
+        return DeviceMeta.model_validate_json(r.text)
+
+    def update_device_meta(self, device_code: str, notes: Optional[str] = _UNSET) -> DeviceMeta:  # type: ignore[assignment]
+        """
+        Passing ``notes=None`` explicitly will clear the notes field.
+        Omitting ``notes`` entirely leaves the existing value unchanged.
+        Currently designed to be extended to future metadata fields.
+        """
+        json: PayloadType = {}
+        if notes is not _UNSET:
+            json['notes'] = notes
+        r = self._client.request(f'/devices/{device_code}/meta', 'PATCH', json=json)
+        return DeviceMeta.model_validate_json(r.text)
+
+    def delete_device_meta(self, device_code: str) -> None:
+        self._client.request(f'/devices/{device_code}/meta', 'DELETE')
