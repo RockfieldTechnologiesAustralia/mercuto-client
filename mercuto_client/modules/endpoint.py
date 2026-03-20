@@ -482,25 +482,33 @@ class MercutoEndpointService:
         return WireguardClientConfigurationSchema.model_validate_json(r.text)
 
     # --- WireGuard Server Information ---
-    def get_wireguard_server_config_version(self) -> Optional[float]:
+    def get_wireguard_server_config_version(self, server_host_code: str) -> Optional[float]:
         """
         Get the current configuration version timestamp for the WireGuard server.
         Returns None if not set.
         """
+        params: PayloadType = {
+            "server_host_code": server_host_code,
+        }
         r = self._client.request(
             f"{self._path}/wireguard/server/config-version",
             "GET",
+            params=params,
         )
         return r.json()
 
-    def get_wireguard_server_version(self) -> Optional[float]:
+    def get_wireguard_server_version(self, server_host_code: str) -> Optional[float]:
         """
         Get the WireGuard server version timestamp.
         Returns None if not set.
         """
+        params: PayloadType = {
+            "server_host_code": server_host_code,
+        }
         r = self._client.request(
             f"{self._path}/wireguard/server/server-version",
             "GET",
+            params=params,
         )
         return r.json()
 
