@@ -68,6 +68,13 @@ class WireguardKeyPair(BaseModel):
     public_key: str
     private_key: str
 
+class ServerHostCreateSchema(BaseModel):
+    hostname: str
+
+
+class ServerHostSchema(ServerHostCreateSchema):
+    code: str
+
 
 # WireGuard Client
 class WireguardClientSchema(BaseModel):
@@ -92,7 +99,7 @@ class WireguardInterfaceSchema(BaseModel):
     port: int
     subnet: int
     bits: int
-    hostname: str
+    server_host: ServerHostSchema
     ip_address: Optional[str] = None
     clients: Optional[List[WireguardClientSchema]] = None
 
