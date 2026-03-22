@@ -9,7 +9,8 @@ from ..modules.endpoint import (DeviceStatsSchema, Ed25519Algorithm,
                                 Healthcheck, MercutoEndpointService,
                                 NetworkEndpointSchema,
                                 NetworkEndpointTypeOutSchema, PeerStatsSchema,
-                                RSAAlgorithm, SSHKeyPair, SSHPublicKeySchema,
+                                RSAAlgorithm, ServerHostSchema, SSHKeyPair,
+                                SSHPublicKeySchema,
                                 WireguardClientConfigurationSchema,
                                 WireguardClientSchema,
                                 WireguardInterfaceSchema, WireguardKeyPair,
@@ -197,7 +198,7 @@ class MockMercutoEndpointService(
         port = 51820
         subnet = 10
         bits = 24
-        hostname = "localhost"
+        server_host = ServerHostSchema(code=str(uuid.uuid4()), hostname="localhost")
         ip_address = f"{subnet}.0.0.1/{bits}"
 
         interface = WireguardInterfaceSchema(
@@ -210,7 +211,7 @@ class MockMercutoEndpointService(
             port=port,
             subnet=subnet,
             bits=bits,
-            hostname=hostname,
+            server_host=server_host,
             ip_address=ip_address,
             clients=[],
         )
@@ -363,16 +364,22 @@ class MockMercutoEndpointService(
         )
 
     # --- WireGuard Server Information ---
-    def get_wireguard_server_config_version(self) -> Optional[float]:
+    def get_wireguard_server_config_version(self, server_host_code: str) -> Optional[float]:
         import time
 
         # Return current timestamp as config version for mock
+        # In a real implementation, this would filter by server_host_code
         if len(self._wireguard_interfaces) > 0:
             return time.time()
         return None
 
-    def get_wireguard_server_version(self) -> Optional[float]:
+    def get_wireguard_server_version(
+        self,
+        interface_code: Optional[str] = None,
+        server_host_code: Optional[str] = None,
+    ) -> Optional[float]:
         # Return mock version as float for compatibility
+        # In a real implementation, this would filter by interface_code or server_host_code
         if len(self._wireguard_interfaces) > 0:
             return 1.0
         return None

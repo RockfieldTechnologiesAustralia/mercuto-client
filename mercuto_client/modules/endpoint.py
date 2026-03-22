@@ -68,6 +68,7 @@ class WireguardKeyPair(BaseModel):
     public_key: str
     private_key: str
 
+
 class ServerHostCreateSchema(BaseModel):
     hostname: str
 
@@ -497,14 +498,21 @@ class MercutoEndpointService:
         )
         return r.json()
 
-    def get_wireguard_server_version(self, server_host_code: str) -> Optional[float]:
+    def get_wireguard_server_version(
+        self,
+        interface_code: Optional[str] = None,
+        server_host_code: Optional[str] = None,
+    ) -> Optional[float]:
         """
         Get the WireGuard server version timestamp.
+        Provide either interface_code OR server_host_code (not both).
         Returns None if not set.
         """
-        params: PayloadType = {
-            "server_host_code": server_host_code,
-        }
+        params: PayloadType = {}
+        if interface_code is not None:
+            params["interface_code"] = interface_code
+        if server_host_code is not None:
+            params["server_host_code"] = server_host_code
         r = self._client.request(
             f"{self._path}/wireguard/server/server-version",
             "GET",

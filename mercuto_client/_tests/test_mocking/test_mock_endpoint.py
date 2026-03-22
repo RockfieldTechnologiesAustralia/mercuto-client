@@ -302,6 +302,10 @@ def test_create_wireguard_interface_with_tenant(client: MercutoClient) -> None:
     assert interface.tenant_code == "tenant1"
     assert interface.port == 51820  # Mock default
     assert interface.public_key is not None
+    # Verify server_host field
+    assert interface.server_host is not None
+    assert interface.server_host.code is not None
+    assert interface.server_host.hostname == "localhost"
 
 
 def test_create_wireguard_interface_with_custom_keys(client: MercutoClient) -> None:
@@ -594,12 +598,14 @@ def test_get_wireguard_server_config_version_with_interface(
     client: MercutoClient,
 ) -> None:
     """Test getting WireGuard server config version when interface exists."""
-    client.endpoint().create_wireguard_interface(
+    interface = client.endpoint().create_wireguard_interface(
         interface_name="wg0",
         tenant_code="tenant1",
     )
 
-    version = client.endpoint().get_wireguard_server_config_version()
+    version = client.endpoint().get_wireguard_server_config_version(
+        server_host_code=interface.server_host.code
+    )
     assert version is not None
     assert isinstance(version, float)
     assert version > 0
@@ -609,18 +615,31 @@ def test_get_wireguard_server_config_version_without_interface(
     client: MercutoClient,
 ) -> None:
     """Test getting WireGuard server config version when no interface exists."""
-    version = client.endpoint().get_wireguard_server_config_version()
+    version = client.endpoint().get_wireguard_server_config_version(
+        server_host_code="non-existent-host"
+    )
     assert version is None
 
 
 def test_get_wireguard_server_version_with_interface(client: MercutoClient) -> None:
     """Test getting WireGuard server version when interface exists."""
-    client.endpoint().create_wireguard_interface(
+    interface = client.endpoint().create_wireguard_interface(
         interface_name="wg0",
         tenant_code="tenant1",
     )
 
-    version = client.endpoint().get_wireguard_server_version()
+    # Test with interface_code
+    version = client.endpoint().get_wireguard_server_version(
+        interface_code=interface.code
+    )
+    assert version is not None
+    assert isinstance(version, float)
+    assert version == 1.0
+
+    # Test with server_host_code
+    version = client.endpoint().get_wireguard_server_version(
+        server_host_code=interface.server_host.code
+    )
     assert version is not None
     assert isinstance(version, float)
     assert version == 1.0
@@ -628,7 +647,9 @@ def test_get_wireguard_server_version_with_interface(client: MercutoClient) -> N
 
 def test_get_wireguard_server_version_without_interface(client: MercutoClient) -> None:
     """Test getting WireGuard server version when no interface exists."""
-    version = client.endpoint().get_wireguard_server_version()
+    version = client.endpoint().get_wireguard_server_version(
+        server_host_code="non-existent-host"
+    )
     assert version is None
 
 
