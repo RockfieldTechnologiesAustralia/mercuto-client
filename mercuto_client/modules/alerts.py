@@ -35,7 +35,7 @@ class Condition(BaseModel):
     lower_end_threshold: Optional[float] = None
     aggregation: Optional[ConditionAggregationOption] = None
     duration_threshold: Optional[timedelta] = None
-    type: Literal['channel-range', 'channel-offline', 'camera-offline']
+    type: Literal['channel-range', 'channel-offline', 'camera-offline', 'ping-status']
 
 
 class AlarmConditionGroup(BaseModel):
