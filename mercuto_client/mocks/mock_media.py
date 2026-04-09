@@ -7,7 +7,8 @@ from typing import Optional
 
 from ..client import MercutoClient
 from ..exceptions import MercutoHTTPException
-from ..modules.media import Image, MercutoMediaService, Video
+from ..modules.media import (Camera, CameraTrigger, CameraType, Image,
+                             MercutoMediaService, Video)
 from ._utility import EnforceOverridesMeta, create_data_url
 
 logger = logging.getLogger(__name__)
@@ -16,8 +17,46 @@ logger = logging.getLogger(__name__)
 class MockMercutoMediaService(MercutoMediaService, metaclass=EnforceOverridesMeta):
     def __init__(self, client: 'MercutoClient'):
         super().__init__(client=client)
+        self._cameras: dict[str, Camera] = {}
         self._events: dict[str, Image] = {}
         self._videos: dict[str, Video] = {}
+
+    def list_cameras(self, project: str) -> list[Camera]:
+        return [cam for cam in self._cameras.values() if cam.project == project]
+
+    def get_camera(self, camera_code: str) -> Camera:
+        if camera_code not in self._cameras:
+            raise MercutoHTTPException(f"Camera not found: {camera_code}", 404)
+        return self._cameras[camera_code]
+
+    def create_camera(self, project: str,
+                      label: str,
+                      triggers: list[CameraTrigger],
+                      encode_timestamp: bool = True,
+                      encode_blur: bool = False,
+                      blur_steps: Optional[int] = None,
+                      blur_sigma: Optional[float] = None,
+                      tunnel_address: Optional[str] = None,
+                      tunnel_port: Optional[int] = None,
+                      tunnel_username: Optional[str] = None,
+                      tunnel_password: Optional[str] = None,
+                      tunnel_key: Optional[str] = None,
+                      camera_ip: Optional[str] = None,
+                      camera_port: Optional[int] = None,
+                      camera_username: Optional[str] = None,
+                      camera_password: Optional[str] = None,
+                      camera_serial: Optional[str] = None,
+                      camera_type: CameraType = 'DIRECT_RTSP',
+                      rtsp_url: Optional[str] = None,) -> Camera:
+        code = str(uuid.uuid4())
+        camera = Camera(code=code, project=project, label=label, triggers=triggers, encode_timestamp=encode_timestamp,
+                        encode_blur=encode_blur, blur_steps=blur_steps, blur_sigma=blur_sigma,
+                        tunnel_address=tunnel_address, tunnel_port=tunnel_port, tunnel_username=tunnel_username,
+                        tunnel_password=tunnel_password, tunnel_key=tunnel_key, camera_ip=camera_ip,
+                        camera_port=camera_port, camera_username=camera_username, camera_password=camera_password,
+                        camera_serial=camera_serial, camera_type=camera_type, rtsp_url=rtsp_url)
+        self._cameras[code] = camera
+        return camera
 
     def upload_image(self, filename: str, project: str,
                      camera: Optional[str] = None,

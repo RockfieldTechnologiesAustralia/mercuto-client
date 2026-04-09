@@ -13,6 +13,8 @@ from ..exceptions import MercutoHTTPException
 from . import PayloadType
 from ._util import BaseModel
 
+CameraType = Literal['BOSCH', 'DIRECT_RTSP', 'STATIC', 'ROCKFIELD-CAMERA-SERVER-VERSION-2', 'VIDAR']
+
 
 class Image(BaseModel):
     code: str
@@ -68,8 +70,7 @@ class Camera(BaseModel):
     project: str
     label: str
     triggers: list[CameraTrigger]
-    camera_type: Literal['BOSCH', 'DIRECT_RTSP',
-                         'STATIC', 'ROCKFIELD-CAMERA-SERVER-VERSION-2']
+    camera_type: CameraType
     encode_timestamp: bool = True
     encode_blur: bool = False
     blur_steps: Optional[int] = None
@@ -90,6 +91,7 @@ class Camera(BaseModel):
 # --- TypeAdapters for lists ---
 _ImagelistAdapter = TypeAdapter(list[Image])
 _VideolistAdapter = TypeAdapter(list[Video])
+_CameralistAdapter = TypeAdapter(list[Camera])
 
 
 class MercutoMediaService:
@@ -266,7 +268,7 @@ class MercutoMediaService:
     def list_cameras(self, project: str) -> list[Camera]:
         r = self._client.request(
             f"{self._path}/cameras", "GET", params={'project': project})
-        return [Camera.model_validate_json(item) for item in r.json()]
+        return _CameralistAdapter.validate_json(r.text)
 
     def get_camera(self, camera_code: str) -> Camera:
         r = self._client.request(
@@ -290,8 +292,7 @@ class MercutoMediaService:
                       camera_username: Optional[str] = None,
                       camera_password: Optional[str] = None,
                       camera_serial: Optional[str] = None,
-                      camera_type: Literal['BOSCH', 'DIRECT_RTSP', 'STATIC',
-                                           'ROCKFIELD-CAMERA-SERVER-VERSION-2'] = 'DIRECT_RTSP',
+                      camera_type: CameraType = 'DIRECT_RTSP',
                       rtsp_url: Optional[str] = None,) -> Camera:
         payload: PayloadType = {
             'label': label,

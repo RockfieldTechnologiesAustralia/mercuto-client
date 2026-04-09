@@ -4,7 +4,7 @@ import time
 from contextlib import nullcontext
 from datetime import datetime, timedelta
 from typing import (TYPE_CHECKING, Any, BinaryIO, Collection, Literal,
-                    Optional, TextIO)
+                    Optional, TextIO, Union)
 
 from pydantic import TypeAdapter
 
@@ -111,9 +111,26 @@ class ChannelFormat(enum.Enum):
     LABEL = "LABEL"
 
 
+class AggregationMethod(enum.Enum):
+    MIN = 'min'
+    MAX = 'max'
+    MEAN = 'mean'
+    SUM = 'sum'
+    COUNT = 'count'
+    GREATEST = 'greatest'
+    PEAK_TO_PEAK = 'peak-to-peak'
+
+
+SHORTHAND_INTERVALS = {'year', 'month',
+                       'week', 'day', 'hour', 'minute', 'second'}
+
+AggregationInterval = Union[timedelta, Literal['year',
+                                               'month', 'week', 'day', 'hour', 'minute', 'second']]
+
+
 class AggregationOptions(BaseModel):
-    method: Literal['min', 'max', 'mean', 'sum', 'count', 'greatest']
-    interval: Literal['second', 'minute', 'hour', 'day', 'week', 'month', 'year']
+    method: AggregationMethod
+    interval: AggregationInterval
     rolling: bool = False
 
 
@@ -176,7 +193,8 @@ class MercutoDataService:
 
         all_channels: list[Channel] = []
         while True:
-            r = self._client.request(f'{self._path}/channels', 'GET', params=params)
+            r = self._client.request(
+                f'{self._path}/channels', 'GET', params=params)
 
             channels = _ChannellistAdapter.validate_json(r.text)
             all_channels.extend(channels)
@@ -186,7 +204,8 @@ class MercutoDataService:
         return all_channels
 
     def get_channel(self, code: str) -> Optional[Channel]:
-        r = self._client.request(f'{self._path}/channels/{code}', 'GET', raise_for_status=False)
+        r = self._client.request(
+            f'{self._path}/channels/{code}', 'GET', raise_for_status=False)
         if r.status_code == 404:
             return None
         raise_for_response(r)
@@ -207,7 +226,8 @@ class MercutoDataService:
         if offset is not None:
             payload['offset'] = offset
 
-        r = self._client.request(f'{self._path}/channels/{code}', 'PATCH', json=payload)
+        r = self._client.request(
+            f'{self._path}/channels/{code}', 'PATCH', json=payload)
         return Channel.model_validate_json(r.text)
 
     def delete_channel(self, code: str) -> bool:
@@ -277,7 +297,8 @@ class MercutoDataService:
         if metric is not None:
             payload["metric"] = metric
 
-        r = self._client.request(f'{self._path}/expressions', 'PUT', json=payload)
+        r = self._client.request(
+            f'{self._path}/expressions', 'PUT', json=payload)
         return Expression.model_validate_json(r.text)
 
     def delete_expression(self, code: str) -> bool:
@@ -295,7 +316,8 @@ class MercutoDataService:
             "sampling_period": serialise_timedelta(sampling_period),
             "column_labels": list(column_labels),
         }
-        r = self._client.request(f'{self._path}/datatables', 'PUT', json=payload)
+        r = self._client.request(
+            f'{self._path}/datatables', 'PUT', json=payload)
         return Datatable.model_validate_json(r.text)
 
     def list_datatables(self, project: str) -> list[Datatable]:
@@ -306,7 +328,8 @@ class MercutoDataService:
             "offset": 0,
         }
         while True:
-            r = self._client.request(f'{self._path}/datatables', 'GET', params=params)
+            r = self._client.request(
+                f'{self._path}/datatables', 'GET', params=params)
 
             batch = _DatatablelistAdapter.validate_json(r.text)
             datatables.extend(batch)
@@ -318,6 +341,14 @@ class MercutoDataService:
     """
     Units
     """
+
+    def get_unit(self, code: str) -> Optional[Units]:
+        r = self._client.request(
+            f'{self._path}/units/{code}', 'GET', raise_for_status=False)
+        if r.status_code == 404:
+            return None
+        raise_for_response(r)
+        return Units.model_validate_json(r.text)
 
     def list_units(self) -> list[Units]:
         r = self._client.request(f'{self._path}/units', 'GET')
@@ -480,7 +511,8 @@ class MercutoDataService:
             if status.status_code >= 400:
                 raise MercutoHTTPException(status.message, status.status_code)
             if time.time() - start_poll > timeout:
-                raise MercutoClientException("Timed out waiting for presigned url.")
+                raise MercutoClientException(
+                    "Timed out waiting for presigned url.")
             time.sleep(poll_interval)
 
     """
@@ -496,7 +528,8 @@ class MercutoDataService:
         Insert secondary samples.
         """
         for batch in batched(samples, 5000):
-            payload = _SecondarySamplelistAdapter.dump_python(list(batch), mode='json')
+            payload = _SecondarySamplelistAdapter.dump_python(
+                list(batch), mode='json')
             self._client.request(
                 f'{self._path}/samples/secondary', 'PUT', json=payload, params={"project": project}
             )
@@ -512,7 +545,8 @@ class MercutoDataService:
         Insert metric samples.
         """
         for batch in batched(samples, 5000):
-            payload = _MetricSamplelistAdapter.dump_python(list(batch), mode='json')
+            payload = _MetricSamplelistAdapter.dump_python(
+                list(batch), mode='json')
             self._client.request(
                 f'{self._path}/samples/metric', 'PUT', json=payload, params={"project": project}
             )

@@ -12,6 +12,7 @@ import requests.cookies
 from ._authentication import (IAuthenticationMethod,
                               create_authentication_method)
 from .exceptions import MercutoClientException, MercutoHTTPException
+from .modules.alerts import MercutoAlertService
 from .modules.core import MercutoCoreService
 from .modules.data import MercutoDataService
 from .modules.fatigue import MercutoFatigueService
@@ -199,6 +200,9 @@ class MercutoClient:
 
     def notifications(self) -> 'MercutoNotificationService':
         return self._add_and_fetch_module('notifications', MercutoNotificationService)
+
+    def alerts(self) -> 'MercutoAlertService':
+        return self._add_and_fetch_module('alerts', MercutoAlertService)
 
     def login(self, authentication: IAuthenticationMethod) -> None:
         self._auth_method = authentication

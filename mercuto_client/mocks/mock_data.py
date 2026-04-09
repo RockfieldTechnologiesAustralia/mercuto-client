@@ -9,11 +9,12 @@ import pandas as pd
 
 from ..client import MercutoClient
 from ..exceptions import MercutoHTTPException
-from ..modules.data import (AggregationOptions, Channel, ChannelClassification,
-                            ChannelFormat, Datatable, DatatableColumn,
-                            FileFormat, FrameFormat, GetStatusRequestResponse,
-                            LatestDataSample, MercutoDataService,
-                            MetricDataSample, SecondaryDataSample)
+from ..modules.data import (AggregationMethod, AggregationOptions, Channel,
+                            ChannelClassification, ChannelFormat, Datatable,
+                            DatatableColumn, FileFormat, FrameFormat,
+                            GetStatusRequestResponse, LatestDataSample,
+                            MercutoDataService, MetricDataSample,
+                            SecondaryDataSample, Units)
 from ._utility import EnforceOverridesMeta
 
 logger = logging.getLogger(__name__)
@@ -33,6 +34,7 @@ class MockMercutoDataService(MercutoDataService, metaclass=EnforceOverridesMeta)
 
         self._channels: dict[str, Channel] = {}
         self._datatables: dict[str, Datatable] = {}
+        self._units: dict[str, Units] = {}
 
     def _last_timestamp(self, channel: str) -> Optional[datetime]:
         if channel in self._secondary_and_primary_buffer.index.get_level_values('channel'):
@@ -108,6 +110,25 @@ class MockMercutoDataService(MercutoDataService, metaclass=EnforceOverridesMeta)
 
         return channel
 
+    def update_channel(self, code: str, label: Optional[str] = None, units: Optional[str] = None,
+                       metric: Optional[str] = None, multiplier: Optional[float] = None,
+                       offset: Optional[float] = None) -> Channel:
+        if code not in self._channels:
+            raise MercutoHTTPException(status_code=404, message="Channel not found")
+        channel = self._channels[code]
+        if label is not None:
+            channel.label = label
+        if units is not None:
+            channel.units = self.get_unit(units)
+        if metric is not None:
+            channel.metric = metric
+        if multiplier is not None:
+            channel.multiplier = multiplier
+        if offset is not None:
+            channel.offset = offset
+        self._channels[code] = channel
+        return channel
+
     def create_request(self,
                        start_time: datetime,
                        end_time: datetime,
@@ -128,9 +149,6 @@ class MockMercutoDataService(MercutoDataService, metaclass=EnforceOverridesMeta)
 
         if channels is None and classification is None:
             raise ValueError("Must supply either channels or classification.")
-
-        if aggregation is not None:
-            raise NotImplementedError("MockMercutoDataService does not support aggregation.")
 
         if channels is None:
             assert classification is not None
@@ -158,6 +176,26 @@ class MockMercutoDataService(MercutoDataService, metaclass=EnforceOverridesMeta)
         assert ts.columns == ['value']
         assert ts.index.names == ['channel', 'timestamp']
 
+        # Apply aggregation options
+        if aggregation is not None:
+            if aggregation.method != AggregationMethod.MEAN:
+                raise NotImplementedError(f"Unsupported aggregation method for MockClient: {aggregation.method}")
+            if aggregation.interval != 'day' and aggregation.interval != timedelta(days=1):
+                raise NotImplementedError(f"Unsupported aggregation interval for MockClient: {aggregation.interval}")
+            if not aggregation.rolling:
+                raise NotImplementedError("MockClient only supports rolling aggregation.")
+            ts = (
+                ts.reset_index()  # type: ignore
+                .sort_values(['channel', 'timestamp'])
+                .groupby('channel')
+                .rolling('1D', on='timestamp', min_periods=1)['value']
+                .mean()
+                .reset_index()
+                .set_index(['channel', 'timestamp'])
+                .sort_index()
+            )
+            assert ts.columns == ['value']
+            assert ts.index.names == ['channel', 'timestamp']
         if frame_format == FrameFormat.COLUMNS:
             ts = ts.reset_index(drop=False).pivot(index='timestamp',
                                                   columns='channel',
@@ -426,3 +464,15 @@ class MockMercutoDataService(MercutoDataService, metaclass=EnforceOverridesMeta)
                                         timestamp=timestamp,
                                         value=row['value']))
         return out
+
+    def get_unit(self, code: str) -> Optional[Units]:
+        return self._units.get(code)
+
+    def list_units(self) -> list[Units]:
+        return list(self._units.values())
+
+    def create_unit(self, name: str, unit: str) -> Units:
+        code = str(uuid.uuid4())
+        unit_obj = Units(code=code, name=name, unit=unit)
+        self._units[code] = unit_obj
+        return unit_obj

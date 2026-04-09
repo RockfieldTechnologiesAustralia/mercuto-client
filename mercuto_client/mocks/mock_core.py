@@ -6,8 +6,8 @@ from typing import Optional
 
 from ..client import MercutoClient
 from ..exceptions import MercutoHTTPException
-from ..modules.core import (Event, ItemCode, MercutoCoreService, Project,
-                            ProjectStatus)
+from ..modules.core import (Device, DeviceChannel, DeviceType, Event, ItemCode,
+                            MercutoCoreService, Project, ProjectStatus)
 from ._utility import EnforceOverridesMeta
 
 logger = logging.getLogger(__name__)
@@ -18,6 +18,14 @@ class MockMercutoCoreService(MercutoCoreService, metaclass=EnforceOverridesMeta)
         super().__init__(client=client)
         self._events: dict[str, Event] = {}
         self._projects: dict[str, Project] = {}
+        self._devices: dict[str, Device] = {}
+
+    def ping_project(self, project: str, ip_address: str) -> None:
+        if project not in self._projects:
+            raise MercutoHTTPException(status_code=404, message=f"Project {project} not found")
+
+        self._projects[project].status.last_ping = datetime.now(py_timezone.utc).isoformat()
+        self._projects[project].status.ip_address = ip_address
 
     def get_project(self, code: str) -> Project:
         if code not in self._projects:
@@ -70,3 +78,40 @@ class MockMercutoCoreService(MercutoCoreService, metaclass=EnforceOverridesMeta)
         if limit is not None:
             filtered = filtered[:limit]
         return filtered
+
+    def list_devices(self, project_code: str, limit: int, offset: int) -> list[Device]:
+        return [device for device in self._devices.values() if device.project.code == project_code][offset:offset+limit]
+
+    def get_device(self, device_code: str) -> Device:
+        if device_code not in self._devices:
+            raise MercutoHTTPException(status_code=404, message=f"Device {device_code} not found")
+        return self._devices[device_code]
+
+    def create_device(self,
+                      project_code: str,
+                      label: str,
+                      device_type_code: str,
+                      groups: list[str],
+                      location_description: Optional[str] = None,
+                      channels: Optional[list[DeviceChannel]] = None,
+                      latitude: Optional[float] = None,
+                      longitude: Optional[float] = None,
+                      altitude: Optional[float] = None
+                      ) -> Device:
+        device = Device(
+            code=str(uuid.uuid4()),
+            project=ItemCode(code=project_code),
+            label=label,
+            device_type=DeviceType(
+                code=device_type_code,
+                description="A mock device type for testing",
+                manufacturer="Mock Manufacturer",
+                model_number="Model X",
+
+            ),
+            groups=groups,
+            location_description=location_description,
+            channels=channels or [],
+        )
+        self._devices[device.code] = device
+        return device
