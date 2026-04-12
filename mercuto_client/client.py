@@ -13,6 +13,7 @@ from ._authentication import (IAuthenticationMethod,
                               create_authentication_method)
 from .exceptions import MercutoClientException, MercutoHTTPException
 from .modules.alerts import MercutoAlertService
+from .modules.connect import MercutoConnectService
 from .modules.core import MercutoCoreService
 from .modules.data import MercutoDataService
 from .modules.fatigue import MercutoFatigueService
@@ -203,6 +204,9 @@ class MercutoClient:
 
     def alerts(self) -> 'MercutoAlertService':
         return self._add_and_fetch_module('alerts', MercutoAlertService)
+
+    def connectivity(self) -> 'MercutoConnectService':
+        return self._add_and_fetch_module('connect', MercutoConnectService)
 
     def login(self, authentication: IAuthenticationMethod) -> None:
         self._auth_method = authentication
