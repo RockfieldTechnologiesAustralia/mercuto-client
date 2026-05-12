@@ -51,7 +51,9 @@ class Alarm(BaseModel):
     contact_group: Optional[str]
     check_type: Literal['event', 'interval']
     condition_groups: list[AlarmConditionGroup]
-    minimum_unique_targets: int
+    minimum_unique_targets: int = 1
+    enabled: bool = True
+    cooldown_period: Optional[timedelta] = None
 
 
 class ConditionLog(BaseModel):
@@ -62,13 +64,14 @@ class ConditionLog(BaseModel):
     end_time: AwareDatetime
 
     target_code: str
-    target_type: Literal['channel', 'camera']
+    target_type: Literal['channel', 'camera', 'project']
     start_value: Optional[float]
     end_value: Optional[float]
     peak_value: Optional[float]
     peak_time: Optional[AwareDatetime]
     event: Optional[str]
     is_still_active: bool
+    condition_settings_snapshot: Optional[dict[str, Any]] = None
 
 
 class AlarmLog(BaseModel):
@@ -80,6 +83,9 @@ class AlarmLog(BaseModel):
     severity: int
     alarm: str
     condition_logs: list[ConditionLog]
+    total_condition_logs: int
+    start_time: AwareDatetime
+    end_time: AwareDatetime
 
 
 # --- TypeAdapters for lists ---
