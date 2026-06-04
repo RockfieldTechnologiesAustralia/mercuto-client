@@ -1,10 +1,10 @@
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import TYPE_CHECKING, Any, Literal, Optional
 
 from pydantic import TypeAdapter
 
 from . import PayloadType
-from ._util import BaseModel, serialise_timedelta
+from ._util import BaseModel
 
 if TYPE_CHECKING:
     from ..client import MercutoClient
@@ -62,23 +62,8 @@ class Dashboards(BaseModel):
     dashboards: list[Dashboard]
 
 
-class ProjectEventDetection(BaseModel):
-    enabled: bool
-    datatables: list[str]
-    max_duration: timedelta
-    max_files: int
-    maximise: bool
-    overlap_period: timedelta
-    split_interval_cron: Optional[str]
-
-
 class ItemCode(BaseModel):
     code: str
-
-
-class EventTag(BaseModel):
-    tag: str
-    value: Any | None
 
 
 class Object(BaseModel):
@@ -90,24 +75,6 @@ class Object(BaseModel):
     project: ItemCode
     access_url: str | None
     access_expires: datetime | None
-
-
-class Event(BaseModel):
-    code: str
-    project: ItemCode
-    start_time: datetime
-    end_time: datetime
-    objects: list[Object]
-    tags: list[EventTag]
-
-
-class EventStatisticsOut(BaseModel):
-    n_events_last_week: int
-    n_events_last_month: int
-    n_events_last_year: int
-    n_events_all_time: int
-    n_events_in_range: int
-    last_event: Optional[Event] = None
 
 
 UserContactMethod = Literal['EMAIL', 'SMS']
@@ -220,7 +187,6 @@ class EventAggregate(BaseModel):
 
 
 _ProjectListAdapter = TypeAdapter(list[Project])
-_EventsListAdapter = TypeAdapter(list[Event])
 _DevicesListAdapter = TypeAdapter(list[Device])
 _DeviceTypeListAdapter = TypeAdapter(list[DeviceType])
 _DeviceGroupListAdapter = TypeAdapter(list[DeviceGroup])
@@ -275,98 +241,6 @@ class MercutoCoreService:
         json = dashboards.model_dump()
         self._client.request(
             f'/projects/{project_code}/dashboard', 'POST', json=json)
-
-    def set_project_event_detection(self, project: str, datatables: list[str]) -> ProjectEventDetection:
-        if len(datatables) == 0:
-            raise ValueError(
-                'At least one datatable must be provided to enable event detection')
-
-        params: PayloadType = {
-            "enabled": True,
-            "datatables": datatables
-        }
-        r = self._client.request(
-            f'/projects/{project}/event-detection', 'POST', json=params)
-        return ProjectEventDetection.model_validate_json(r.text)
-
-    # EVENTS
-
-    def create_event(self, project: str, start_time: datetime, end_time: datetime) -> Event:
-        if start_time.tzinfo is None or end_time.tzinfo is None:
-            raise ValueError("Timestamp must be timezone aware")
-
-        json: PayloadType = {
-            'project': project,
-            'start_time': start_time.isoformat(),
-            'end_time': end_time.isoformat(),
-        }
-        r = self._client.request('/events', 'PUT', json=json)
-        return Event.model_validate_json(r.text)
-
-    def list_events(self, project: str,
-                    start_time: Optional[datetime] = None,
-                    end_time: Optional[datetime] = None,
-                    limit: Optional[int] = None, offset: Optional[int] = 0,
-                    ascending: bool = True) -> list[Event]:
-        """
-        Lists events for a project, optionally filtered by time range.
-        :param project: Project code to list events for.
-        :param start_time: Optional start time to filter events from.
-        :param end_time: Optional end time to filter events to.
-        :param limit: Optional maximum number of events to return. Default is set by API (usually 10).
-        :param offset: Optional offset for pagination.
-        :param ascending: Whether to sort events in ascending order by start time.
-        :return: List of Event objects.
-        """
-        params: PayloadType = {'project_code': project, 'ascending': ascending}
-        if start_time is not None:
-            params['start_time'] = start_time.isoformat()
-        if end_time is not None:
-            params['end_time'] = end_time.isoformat()
-        if limit is not None:
-            params['limit'] = limit
-        if offset is not None:
-            params['offset'] = offset
-        r = self._client.request('/events', 'GET', params=params)
-        return _EventsListAdapter.validate_json(r.text)
-
-    def get_event(self, event: str) -> Event:
-        r = self._client.request(f'/events/{event}', 'GET')
-        return Event.model_validate_json(r.text)
-
-    def delete_event(self, event: str) -> None:
-        self._client.request(f'/events/{event}', 'DELETE')
-
-    def get_nearest_event(
-        self,
-        project_code: str,
-        to: datetime,
-        maximum_delta: timedelta | None = None,
-    ) -> Event:
-        params: PayloadType = {
-            'project_code': project_code,
-            'to': to.isoformat(),
-        }
-        if maximum_delta is not None:
-            params['maximum_delta'] = serialise_timedelta(maximum_delta)
-
-        r = self._client.request('/events/nearest', 'GET', params=params)
-        return Event.model_validate_json(r.text)
-
-    def get_event_statistics(
-        self,
-        project_code: str,
-        start_time: datetime,
-        end_time: datetime,
-    ) -> EventStatisticsOut:
-        params: PayloadType = {
-            'project_code': project_code,
-            'start_time': start_time.isoformat(),
-            'end_time': end_time.isoformat(),
-        }
-
-        r = self._client.request('/events/statistics', 'GET', params=params)
-        return EventStatisticsOut.model_validate_json(r.text)
 
     def set_event_aggregates(self, project: str, aggregates: list[EventAggregate]) -> None:
         self._client.request('/aggregates', 'PUT',

@@ -16,6 +16,7 @@ from .modules.alerts import MercutoAlertService
 from .modules.connect import MercutoConnectService
 from .modules.core import MercutoCoreService
 from .modules.data import MercutoDataService
+from .modules.events import MercutoEventService
 from .modules.fatigue import MercutoFatigueService
 from .modules.identity import MercutoIdentityService
 from .modules.media import MercutoMediaService
@@ -204,6 +205,9 @@ class MercutoClient:
 
     def alerts(self) -> 'MercutoAlertService':
         return self._add_and_fetch_module('alerts', MercutoAlertService)
+
+    def events(self) -> 'MercutoEventService':
+        return self._add_and_fetch_module('events', MercutoEventService)
 
     def connectivity(self) -> 'MercutoConnectService':
         return self._add_and_fetch_module('connect', MercutoConnectService)

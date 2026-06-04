@@ -14,6 +14,7 @@ def mock_mercuto(data: bool = True,
                  media: bool = True,
                  notifications: bool = True,
                  connect: bool = True,
+                 events: bool = True,
                  verify_service_token: Optional[Callable[[str], VerifyMyPermissions]] = None) -> Iterator[None]:
     """
     While this context is active, all calls to MercutoClient will use mocked services.
@@ -39,6 +40,8 @@ def mock_mercuto(data: bool = True,
             stack.enter_context(mock_notifications_module())
         if connect:
             stack.enter_context(mock_connect_module())
+        if events:
+            stack.enter_context(mock_events_module())
         yield
 
 
@@ -188,3 +191,24 @@ def mock_connect_module() -> Iterator[None]:
         yield
     finally:
         setattr(MercutoClient, 'connectivity', original)
+
+
+@contextlib.contextmanager
+def mock_events_module() -> Iterator[None]:
+    from .mock_events import MockMercutoEventService
+    original = MercutoClient.events
+
+    _cache: Optional[MockMercutoEventService] = None
+
+    def stub(self: MercutoClient) -> MockMercutoEventService:
+        nonlocal _cache
+        if _cache is None:
+            _cache = MockMercutoEventService(self)
+        _cache._client = self
+        return _cache
+
+    try:
+        setattr(MercutoClient, 'events', stub)
+        yield
+    finally:
+        setattr(MercutoClient, 'events', original)
