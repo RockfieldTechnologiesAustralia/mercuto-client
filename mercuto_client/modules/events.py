@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from enum import Enum
 from typing import TYPE_CHECKING, Any, Literal, Optional
 
@@ -12,6 +12,19 @@ from ._util import BaseModel
 
 # ── Events ───────────────────────────────────────────────
 EventDetectorType = Literal['cron', 'generic']
+
+
+class CronDetectorConfig(BaseModel):
+    cron_expression: str
+    detector_type: Literal['cron'] = 'cron'
+
+
+class GenericDetectorConfig(BaseModel):
+    max_gap: timedelta = timedelta(seconds=1)
+    max_duration: timedelta = timedelta(hours=1)
+    max_files: int = -1
+    maximise: bool = True
+    detector_type: Literal['generic'] = 'generic'
 
 
 class Tag(BaseModel):
@@ -54,9 +67,8 @@ class Event(BaseModel):
 class DetectorSettings(BaseModel):
     id: int
     project: str
-    detector_type: EventDetectorType
     enabled: bool
-    config: dict[str, Any]
+    config: CronDetectorConfig | GenericDetectorConfig
     datatables: list[str]
 
 
@@ -281,7 +293,7 @@ class MercutoEventService:
             'end_time': end_time.isoformat(),
         }
         if tags is not None:
-            body['tags'] = [t.model_dump()
+            body['tags'] = [t.model_dump(mode='json')
                             for t in tags]  # type: ignore[assignment]
         r = self._client.request(f"{self._path}/details", "POST", json=body)
         return Event.model_validate_json(r.text)
@@ -292,7 +304,7 @@ class MercutoEventService:
             'to': to.isoformat(),
         }
         r = self._client.request(
-            f"{self._path}/details/nearest", "GET", params=params)
+            f"{self._path}/search/nearest", "GET", params=params)
         return Event.model_validate_json(r.text)
 
     def get_event(self, event: str) -> Event:
@@ -309,7 +321,7 @@ class MercutoEventService:
         if end_time is not None:
             body['end_time'] = end_time.isoformat()
         if tags is not None:
-            body['tags'] = [t.model_dump()
+            body['tags'] = [t.model_dump(mode='json')
                             for t in tags]  # type: ignore[assignment]
         r = self._client.request(
             f"{self._path}/details/{event}", "PATCH", json=body)
@@ -348,36 +360,39 @@ class MercutoEventService:
             f"{self._path}/detectors/{detector_id}", "GET")
         return DetectorSettings.model_validate_json(r.text)
 
-    def create_detector_settings(self, project: str, detector_type: EventDetectorType = 'generic',
-                                 enabled: bool = True,
-                                 config: Optional[dict[str, Any]] = None,
-                                 datatables: Optional[list[str]] = None) -> DetectorSettings:
+    def create_detector(self, project: str,
+                        datatables: list[str],
+                        enabled: bool = True,
+                        config: CronDetectorConfig | GenericDetectorConfig | None = None,
+                        ) -> DetectorSettings:
+        if config is None:
+            config = GenericDetectorConfig()
         body: PayloadType = {
             'project': project,
-            'detector_type': detector_type,
             'enabled': enabled,
-            'config': config or {},
-            'datatables': datatables or [],
+            'config': config.model_dump(mode='json'),
+            'datatables': datatables,
         }
         r = self._client.request(f"{self._path}/detectors", "POST", json=body)
         return DetectorSettings.model_validate_json(r.text)
 
-    def update_detector_settings(self, detector_id: int, project: str,
-                                 detector_type: EventDetectorType, enabled: bool = True,
-                                 config: Optional[dict[str, Any]] = None,
-                                 datatables: Optional[list[str]] = None) -> DetectorSettings:
+    def update_detector(self, detector_id: int,
+                        datatables: list[str],
+                        enabled: bool = True,
+                        config: CronDetectorConfig | GenericDetectorConfig | None = None,
+                        ) -> DetectorSettings:
+        if config is None:
+            config = GenericDetectorConfig()
         body: PayloadType = {
-            'project': project,
-            'detector_type': detector_type,
             'enabled': enabled,
-            'config': config or {},
-            'datatables': datatables or [],
+            'datatables': datatables,
+            'config': config.model_dump(mode='json'),
         }
         r = self._client.request(
             f"{self._path}/detectors/{detector_id}", "PUT", json=body)
         return DetectorSettings.model_validate_json(r.text)
 
-    def delete_detector_settings(self, detector_id: int) -> None:
+    def delete_detector(self, detector_id: int) -> None:
         self._client.request(f"{self._path}/detectors/{detector_id}", "DELETE")
 
     # ── Processing ───────────────────────────────────────
@@ -401,7 +416,9 @@ class MercutoEventService:
 
     def calibrate(self, config_id: int,
                   vehicles: list[CalibrationVehicle]) -> CalibrationResult:
-        body: PayloadType = {'vehicles': [v.model_dump() for v in vehicles]}
+        # type: ignore[dict-item]
+        body: PayloadType = {'vehicles': [
+            v.model_dump(mode='json') for v in vehicles]}
         r = self._client.request(
             f"{self._path}/processing/{config_id}/calibrate", "POST", json=body)
         return CalibrationResult.model_validate_json(r.text)

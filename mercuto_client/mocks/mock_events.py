@@ -72,7 +72,7 @@ class MockMercutoEventService:
                      tags: Optional[list[Tag]] = None) -> Event:
         if event not in self._events:
             raise MercutoHTTPException("Event not found", 404)
-        event = self._events[event]
+        event_model = self._events[event]
         updates: dict[str, Any] = {}
         if start_time is not None:
             updates['start_time'] = start_time
@@ -80,7 +80,7 @@ class MockMercutoEventService:
             updates['end_time'] = end_time
         if tags is not None:
             updates['tags'] = tags
-        updated = event.model_copy(update=updates)
+        updated = event_model.model_copy(update=updates)
         self._events[event] = updated
         return updated
 
@@ -93,24 +93,24 @@ class MockMercutoEventService:
                       tag_value: Any = None) -> None:
         if event not in self._events:
             raise MercutoHTTPException("Event not found", 404)
-        event = self._events[event]
-        tags = [t for t in event.tags if t.tag_name != tag_name]
+        event_model = self._events[event]
+        tags = [t for t in event_model.tags if t.tag_name != tag_name]
         tags.append(Tag(tag_name=tag_name, tag_value=tag_value))
-        self._events[event] = event.model_copy(update={'tags': tags})
+        self._events[event] = event_model.model_copy(update={'tags': tags})
 
     def get_next_event(self, event: str, direction: str, step: int = 1) -> Event:
         if event not in self._events:
             raise MercutoHTTPException("Event not found", 404)
-        event = self._events[event]
-        candidates = [e for e in self._events.values() if e.project == event.project]
+        event_model = self._events[event]
+        candidates = [e for e in self._events.values() if e.project == event_model.project]
         if direction == "forward":
             candidates = sorted(
-                [e for e in candidates if e.start_time > event.start_time],
+                [e for e in candidates if e.start_time > event_model.start_time],
                 key=lambda e: e.start_time,
             )
         else:
             candidates = sorted(
-                [e for e in candidates if e.start_time < event.start_time],
+                [e for e in candidates if e.start_time < event_model.start_time],
                 key=lambda e: e.start_time,
                 reverse=True,
             )
