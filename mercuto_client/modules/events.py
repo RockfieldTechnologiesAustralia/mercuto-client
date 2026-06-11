@@ -164,7 +164,15 @@ class CalibrationMetadata(BaseModel):
     calibrated_at: datetime
     vehicles: list[CalibrationVehicle]
     kg_per_strain: float
-    report_storage_key: str
+    report_url: str
+
+
+class ProcessingConfigBodyIn(BaseModel):
+    aggregation: Optional[list[AggregationConfig]] = None
+    velocity_estimation: Optional[VelocityEstimationConfig] = None
+    dynamic_amplification: Optional[DynamicAmplificationConfig] = None
+    vehicle_bwim: Optional[VehicleBWimConfig] = None
+    load_distribution: Optional[LoadDistributionConfig] = None
 
 
 class ProcessingConfigBody(BaseModel):
@@ -208,7 +216,7 @@ class CalibrationEventResult(BaseModel):
 class CalibrationResult(BaseModel):
     kg_per_strain: float
     per_event: list[CalibrationEventResult]
-    report_storage_key: str
+    report_url: str
 
 
 # ── Reprocessing ─────────────────────────────────────────
@@ -430,7 +438,7 @@ class MercutoEventService:
         return ProcessingConfig.model_validate_json(r.text)
 
     def set_processing_config(self, project: str,
-                              config: ProcessingConfigBody,
+                              config: ProcessingConfigBodyIn,
                               enabled: bool = True) -> ProcessingConfig:
         body: PayloadType = {
             'project': project,
