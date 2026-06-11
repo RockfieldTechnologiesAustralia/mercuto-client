@@ -61,6 +61,13 @@ class Event(BaseModel):
     artifacts: list[Artifact]
 
 
+class EventStatus(BaseModel):
+    service: str
+    status: Literal['completed', 'failed']
+    message: str | None
+    updated_at: datetime
+
+
 # ── Detectors ────────────────────────────────────────────
 
 
@@ -346,6 +353,11 @@ class MercutoEventService:
         r = self._client.request(
             f"{self._path}/details/{event}/next", "GET", params=params)
         return Event.model_validate_json(r.text)
+
+    def get_event_status(self, event: str) -> list[EventStatus]:
+        r = self._client.request(
+            f"{self._path}/details/{event}/status", "GET")
+        return [EventStatus.model_validate_json(item) for item in r.json()]
 
     # ── Detectors ────────────────────────────────────────
 
