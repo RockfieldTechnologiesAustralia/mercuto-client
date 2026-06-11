@@ -149,10 +149,14 @@ class DynamicAmplificationConfig(BaseModel):
     minimum_amplitude: float = 10.0
 
 
+class CalibrationAxle(BaseModel):
+    position_m: float
+    mass_kg: float
+
+
 class CalibrationVehicle(BaseModel):
-    event: str
-    known_gross_mass_kg: float
-    known_axle_spacings_m: list[float]
+    event_code: str
+    axles: list[CalibrationAxle]
     known_velocity_kmh: float
 
 
@@ -179,14 +183,24 @@ class ProcessingConfig(BaseModel):
     config: ProcessingConfigBody
 
 
+class AxleSpacingComparison(BaseModel):
+    known_m: float
+    detected_m: float
+    error_m: float
+
+
+class AxleCalibrationResult(BaseModel):
+    measurement: float
+    kg_per_strain: Optional[float] = None
+
+
 class CalibrationEventResult(BaseModel):
-    event: str
+    event_code: str
     known_velocity_kmh: float
     estimated_velocity_kmh: float
     velocity_error_kmh: float
-    detected_axle_spacings_m: list[float]
-    known_axle_spacings_m: list[float]
-    axle_spacing_errors_m: list[float]
+    axle_spacings: list[AxleSpacingComparison]
+    axle_results: list[AxleCalibrationResult]
     raw_strain_measurement: float
     derived_kg_per_strain: float
 
