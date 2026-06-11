@@ -48,7 +48,7 @@ class Artifact(BaseModel):
     download_url: str
     mime_type: str
     size_bytes: int
-    vehicle_id: Optional[int] = None
+    vehicle_index: Optional[int] = None
 
 
 class Event(BaseModel):
