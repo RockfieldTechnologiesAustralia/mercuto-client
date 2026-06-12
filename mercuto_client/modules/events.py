@@ -266,6 +266,7 @@ class ReprocessingJobSummary(BaseModel):
 _DetectorSettingsListAdapter = TypeAdapter(list[DetectorSettings])
 _ReprocessingJobSummaryListAdapter = TypeAdapter(list[ReprocessingJobSummary])
 _EventListAdapter = TypeAdapter(list[Event])
+_EventStatusListAdapter = TypeAdapter(list[EventStatus])
 
 
 # ── Statistics ───────────────────────────────────────────
@@ -379,7 +380,7 @@ class MercutoEventService:
     def get_event_status(self, event: str) -> list[EventStatus]:
         r = self._client.request(
             f"{self._path}/details/{event}/status", "GET")
-        return [EventStatus.model_validate_json(item) for item in r.json()]
+        return _EventStatusListAdapter.validate_json(r.text)
 
     # ── Detectors ────────────────────────────────────────
 
