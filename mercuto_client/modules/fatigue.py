@@ -184,6 +184,6 @@ class MercutoFatigueService:
             "end_time": end_time.isoformat(),
         }
         r = self._client.request(
-            f"{self._path}/connection_data/remnant-capacity", "GET", params=params
+            f"{self._path}/connection-data/remnant-capacity", "GET", params=params
         )
         return _ConnectionRemnantCapacitylistAdapter.validate_json(r.text)
