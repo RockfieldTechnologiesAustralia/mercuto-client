@@ -161,10 +161,13 @@ class CalibrationVehicle(BaseModel):
 
 
 class CalibrationMetadata(BaseModel):
-    calibrated_at: datetime
-    vehicles: list[CalibrationVehicle]
-    kg_per_strain: float
-    report_url: str
+    status: Literal['processing', 'completed', 'failed']
+    requested_at: datetime
+    status_message: Optional[str] = None
+    calibrated_at: Optional[datetime] = None
+    vehicles: list[CalibrationVehicle] = []
+    kg_per_strain: Optional[float] = None
+    report_url: Optional[str] = None
 
 
 class ProcessingConfigBodyIn(BaseModel):
@@ -217,6 +220,11 @@ class CalibrationResult(BaseModel):
     kg_per_strain: float
     per_event: list[CalibrationEventResult]
     report_url: str
+
+
+class CalibrationStatus(BaseModel):
+    status: Literal['processing', 'completed', 'failed']
+    message: Optional[str] = None
 
 
 # ── Reprocessing ─────────────────────────────────────────
@@ -450,13 +458,13 @@ class MercutoEventService:
         return ProcessingConfig.model_validate_json(r.text)
 
     def calibrate(self, config_id: int,
-                  vehicles: list[CalibrationVehicle]) -> CalibrationResult:
+                  vehicles: list[CalibrationVehicle]) -> CalibrationStatus:
         # type: ignore[dict-item]
         body: PayloadType = {'vehicles': [
             v.model_dump(mode='json') for v in vehicles]}
         r = self._client.request(
             f"{self._path}/processing/{config_id}/calibrate", "POST", json=body)
-        return CalibrationResult.model_validate_json(r.text)
+        return CalibrationStatus.model_validate_json(r.text)
 
     # ── Reprocessing ─────────────────────────────────────
 

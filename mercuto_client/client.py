@@ -8,6 +8,8 @@ from typing import (Any, Iterator, Literal, Mapping, Optional, Protocol, Type,
 
 import requests
 import requests.cookies
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 from ._authentication import (IAuthenticationMethod,
                               create_authentication_method)
@@ -34,6 +36,26 @@ class _ModuleBase(Protocol):
 _T = TypeVar('_T', bound=_ModuleBase)
 
 
+def _configure_retries(session: requests.Session) -> None:
+    """
+    Mount HTTP adapters on the session that automatically retry failed
+    requests using an exponential backoff strategy.
+    """
+    retry = Retry(
+        total=3,
+        connect=3,
+        read=3,
+        status=3,
+        backoff_factor=0.5,
+        status_forcelist=(429, 500, 502, 503, 504),
+        allowed_methods=None,
+        raise_on_status=False,
+    )
+    adapter = HTTPAdapter(max_retries=retry)
+    session.mount('http://', adapter)
+    session.mount('https://', adapter)
+
+
 class MercutoClient:
     def __init__(self, url: Optional[str] = None, verify_ssl: bool = True, active_session: Optional[requests.Session] = None) -> None:
         if url is None:
@@ -51,6 +73,7 @@ class MercutoClient:
 
         if active_session is None:
             self._current_session = requests.Session()
+            _configure_retries(self._current_session)
         else:
             self._current_session = active_session
 
