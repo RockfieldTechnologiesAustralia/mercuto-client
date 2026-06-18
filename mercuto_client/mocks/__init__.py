@@ -10,7 +10,6 @@ from ..client import MercutoClient
 def mock_mercuto(data: bool = True,
                  identity: bool = True,
                  fatigue: bool = True,
-                 core: bool = True,
                  media: bool = True,
                  notifications: bool = True,
                  connect: bool = True,
@@ -33,8 +32,8 @@ def mock_mercuto(data: bool = True,
                 verify_service_token=verify_service_token))
         if fatigue:
             stack.enter_context(mock_fatigue_module())
-        if core:
-            stack.enter_context(mock_core_module())
+        if assets:
+            stack.enter_context(mock_assets_module())
         if media:
             stack.enter_context(mock_media_module())
         if notifications:
@@ -46,27 +45,6 @@ def mock_mercuto(data: bool = True,
         if assets:
             stack.enter_context(mock_assets_module())
         yield
-
-
-@contextlib.contextmanager
-def mock_core_module() -> Iterator[None]:
-    from .mock_core import MockMercutoCoreService
-    original = MercutoClient.core
-
-    _cache: Optional[MockMercutoCoreService] = None
-
-    def stub(self: MercutoClient) -> MockMercutoCoreService:
-        nonlocal _cache
-        if _cache is None:
-            _cache = MockMercutoCoreService(self)
-        _cache._client = self
-        return _cache
-
-    try:
-        setattr(MercutoClient, 'core', stub)
-        yield
-    finally:
-        setattr(MercutoClient, 'core', original)
 
 
 @contextlib.contextmanager

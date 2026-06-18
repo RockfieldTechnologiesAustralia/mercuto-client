@@ -2,7 +2,7 @@ import pytest
 
 from ... import MercutoClient
 from ...exceptions import MercutoHTTPException
-from ...modules.assets import ChannelIn, MetadataEntry
+from ...modules.assets import DeviceChannel, MetadataEntry
 
 
 def test_healthcheck_and_ping(client: MercutoClient) -> None:
@@ -62,7 +62,7 @@ def test_device_crud(client: MercutoClient) -> None:
         metadata={
             'serial': MetadataEntry(data_type='string', value='SN-001'),
         },
-        channels=[ChannelIn(field='strain', channel='CH-1')],
+        channels=[DeviceChannel(field='strain', channel='CH-1')],
     )
 
     fetched_child = client.assets().get_device(child.code)
@@ -81,7 +81,7 @@ def test_device_crud(client: MercutoClient) -> None:
         metadata={
             'tags': MetadataEntry(data_type='string', is_list=True, values=['A', 'B']),
         },
-        channels=[ChannelIn(field='temperature', channel='CH-2')],
+        channels=[DeviceChannel(field='temperature', channel='CH-2')],
     )
     assert updated_child.label == 'Strain Sensor v2'
     assert updated_child.metadata['tags'].is_list is True

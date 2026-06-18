@@ -6,7 +6,7 @@ from typing import Optional
 
 from ..client import MercutoClient
 from ..exceptions import MercutoHTTPException
-from ..modules.assets import (ChannelIn, ChannelOut, Device, Healthcheck,
+from ..modules.assets import (Device, DeviceChannel, Healthcheck,
                               MercutoAssetService, MetadataEntry, Project)
 from ._utility import EnforceOverridesMeta
 
@@ -32,8 +32,8 @@ class MockMercutoAssetService(MercutoAssetService, metaclass=EnforceOverridesMet
 
     # --- Projects routes ---
 
-    def list_projects(self) -> list[Project]:
-        return sorted(self._projects.values(), key=lambda p: p.code)
+    def list_projects(self, limit: int = 100, offset: int = 0) -> list[Project]:
+        return sorted(self._projects.values(), key=lambda p: p.code)[offset:offset + limit]
 
     def create_project(
         self,
@@ -45,7 +45,7 @@ class MockMercutoAssetService(MercutoAssetService, metaclass=EnforceOverridesMet
         timezone: Optional[str] = None,
         commissioned_at: Optional[datetime] = None,
         is_active: bool = True,
-        project_number: Optional[int] = None,
+        project_number: Optional[str] = None,
     ) -> Project:
         code = str(uuid.uuid4())
         now = datetime.now(UTC)
@@ -105,9 +105,10 @@ class MockMercutoAssetService(MercutoAssetService, metaclass=EnforceOverridesMet
 
     # --- Devices routes ---
 
-    def list_devices(self, project: str) -> list[Device]:
+    def list_devices(self, project: str, limit: int = 100, offset: int = 0) -> list[Device]:
         self.get_project(project)
-        return sorted([d for d in self._devices.values() if d.project == project], key=lambda d: d.label)
+        devices = sorted([d for d in self._devices.values() if d.project == project], key=lambda d: d.label)
+        return devices[offset:offset + limit]
 
     def create_device(
         self,
@@ -119,7 +120,7 @@ class MockMercutoAssetService(MercutoAssetService, metaclass=EnforceOverridesMet
         longitude: Optional[float] = None,
         altitude: Optional[float] = None,
         metadata: Optional[dict[str, MetadataEntry]] = None,
-        channels: Optional[list[ChannelIn]] = None,
+        channels: Optional[list[DeviceChannel]] = None,
     ) -> Device:
         self.get_project(project)
         if parent is not None:
@@ -142,7 +143,7 @@ class MockMercutoAssetService(MercutoAssetService, metaclass=EnforceOverridesMet
             altitude=altitude,
             metadata=metadata or {},
             channels=[
-                ChannelOut(field=channel.field, channel=channel.channel)
+                DeviceChannel(field=channel.field, channel=channel.channel)
                 for channel in (channels or [])
             ],
             children=[],
@@ -171,7 +172,7 @@ class MockMercutoAssetService(MercutoAssetService, metaclass=EnforceOverridesMet
         longitude: Optional[float] = None,
         altitude: Optional[float] = None,
         metadata: Optional[dict[str, MetadataEntry]] = None,
-        channels: Optional[list[ChannelIn]] = None,
+        channels: Optional[list[DeviceChannel]] = None,
     ) -> Device:
         existing = self.get_device(code)
 
@@ -190,7 +191,7 @@ class MockMercutoAssetService(MercutoAssetService, metaclass=EnforceOverridesMet
             'altitude': altitude,
             'metadata': metadata or {},
             'channels': [
-                ChannelOut(field=channel.field, channel=channel.channel)
+                DeviceChannel(field=channel.field, channel=channel.channel)
                 for channel in (channels or [])
             ],
             'updated_at': datetime.now(UTC),
