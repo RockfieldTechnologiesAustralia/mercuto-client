@@ -25,6 +25,7 @@ class Project(BaseModel):
     latitude: Optional[float] = None
     longitude: Optional[float] = None
     timezone: Optional[str] = None
+    display_timezone: Optional[str] = None
     commissioned_at: Optional[datetime] = None
     status: Optional[Status] = None
     is_active: bool
@@ -362,6 +363,7 @@ class MercutoAssetService:
         commissioned_at: Optional[datetime] = None,
         is_active: bool = True,
         project_number: Optional[str] = None,
+        display_timezone: Optional[str] = None,
     ) -> Project:
         payload: PayloadType = {
             'tenant': tenant,
@@ -373,6 +375,7 @@ class MercutoAssetService:
             'commissioned_at': commissioned_at.isoformat() if commissioned_at is not None else None,
             'is_active': is_active,
             'project_number': project_number,
+            'display_timezone': display_timezone,
         }
         r = self._client.request(
             f"{self._path}/projects", 'POST', json=payload)
@@ -392,6 +395,7 @@ class MercutoAssetService:
         timezone: Optional[str] = None,
         commissioned_at: Optional[datetime] = None,
         is_active: bool = True,
+        display_timezone: Optional[str] = None,
     ) -> Project:
         payload: PayloadType = {
             'name': name,
@@ -401,6 +405,7 @@ class MercutoAssetService:
             'timezone': timezone,
             'commissioned_at': commissioned_at.isoformat() if commissioned_at is not None else None,
             'is_active': is_active,
+            'display_timezone': display_timezone,
         }
         r = self._client.request(
             f"{self._path}/projects/{code}", 'PUT', json=payload)

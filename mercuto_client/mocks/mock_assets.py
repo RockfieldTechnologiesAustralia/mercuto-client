@@ -46,6 +46,7 @@ class MockMercutoAssetService(MercutoAssetService, metaclass=EnforceOverridesMet
         commissioned_at: Optional[datetime] = None,
         is_active: bool = True,
         project_number: Optional[str] = None,
+        display_timezone: Optional[str] = None,
     ) -> Project:
         code = str(uuid.uuid4())
         now = datetime.now(UTC)
@@ -62,6 +63,7 @@ class MockMercutoAssetService(MercutoAssetService, metaclass=EnforceOverridesMet
             created_at=now,
             updated_at=now,
             project_number=project_number,
+            display_timezone=display_timezone,
         )
         self._projects[code] = project
         return project
@@ -82,6 +84,7 @@ class MockMercutoAssetService(MercutoAssetService, metaclass=EnforceOverridesMet
         timezone: Optional[str] = None,
         commissioned_at: Optional[datetime] = None,
         is_active: bool = True,
+        display_timezone: Optional[str] = None,
     ) -> Project:
         project = self.get_project(code)
         updated = project.model_copy(update={
@@ -93,6 +96,7 @@ class MockMercutoAssetService(MercutoAssetService, metaclass=EnforceOverridesMet
             'commissioned_at': commissioned_at,
             'is_active': is_active,
             'updated_at': datetime.now(UTC),
+            'display_timezone': display_timezone,
         })
         self._projects[code] = updated
         return updated
