@@ -45,6 +45,7 @@ class MockMercutoAssetService(MercutoAssetService, metaclass=EnforceOverridesMet
         timezone: Optional[str] = None,
         commissioned_at: Optional[datetime] = None,
         is_active: bool = True,
+        project_number: Optional[int] = None,
     ) -> Project:
         code = str(uuid.uuid4())
         now = datetime.now(UTC)
@@ -60,6 +61,7 @@ class MockMercutoAssetService(MercutoAssetService, metaclass=EnforceOverridesMet
             is_active=is_active,
             created_at=now,
             updated_at=now,
+            project_number=project_number,
         )
         self._projects[code] = project
         return project

@@ -22,6 +22,7 @@ class Project(BaseModel):
     is_active: bool
     created_at: datetime
     updated_at: datetime
+    project_number: Optional[int] = None
 
 
 class ChannelIn(BaseModel):
@@ -108,6 +109,7 @@ class MercutoAssetService:
         timezone: Optional[str] = None,
         commissioned_at: Optional[datetime] = None,
         is_active: bool = True,
+        project_number: Optional[int] = None,
     ) -> Project:
         payload: PayloadType = {
             'tenant': tenant,
@@ -118,6 +120,7 @@ class MercutoAssetService:
             'timezone': timezone,
             'commissioned_at': commissioned_at.isoformat() if commissioned_at is not None else None,
             'is_active': is_active,
+            'project_number': project_number,
         }
         r = self._client.request(f"{self._path}/projects", 'POST', json=payload)
         return Project.model_validate_json(r.text)
