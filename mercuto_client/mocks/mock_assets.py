@@ -24,11 +24,21 @@ class MockMercutoAssetService(MercutoAssetService, metaclass=EnforceOverridesMet
         return Healthcheck(status='ok')
 
     def ping_project(self, project: str, ip_address: str) -> None:
-        self.get_project(project)
+        project_entry = self.get_project(project)
         try:
             ipaddress.ip_address(ip_address)
         except ValueError as exc:
             raise MercutoHTTPException("Not a valid IP address", 400) from exc
+        now = datetime.now(UTC)
+        if project_entry.status is None:
+            project_entry.status = Project.Status(last_ping=now, last_ip_change=now,
+                                                  ip_address=ip_address, previous_ip_address=None)
+        else:
+            project_entry.status.last_ping = now
+            if project_entry.status.ip_address != ip_address:
+                project_entry.status.previous_ip_address = project_entry.status.ip_address
+                project_entry.status.ip_address = ip_address
+                project_entry.status.last_ip_change = now
 
     # --- Projects routes ---
 
