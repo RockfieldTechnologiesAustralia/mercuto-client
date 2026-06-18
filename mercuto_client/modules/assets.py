@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import TYPE_CHECKING, Any, Literal, Optional
 
-from pydantic import Field, TypeAdapter, model_validator
+from pydantic import Field, TypeAdapter, field_validator, model_validator
 
 if TYPE_CHECKING:
     from ..client import MercutoClient
@@ -11,6 +11,12 @@ from ._util import BaseModel
 
 
 class Project(BaseModel):
+    class Status(BaseModel):
+        last_ping: datetime
+        last_ip_change: datetime
+        ip_address: str
+        previous_ip_address: Optional[str] = None
+
     code: str
     tenant: str
     name: str
@@ -19,6 +25,7 @@ class Project(BaseModel):
     longitude: Optional[float] = None
     timezone: Optional[str] = None
     commissioned_at: Optional[datetime] = None
+    status: Optional[Status] = None
     is_active: bool
     created_at: datetime
     updated_at: datetime
@@ -155,8 +162,122 @@ class Display(BaseModel):
     updated_at: datetime
 
 
+# ── Device types ────────────────────────────────────────────────────────────
+
+
+class DeviceTypeMetadataFieldDefinition(BaseModel):
+    metadata_key: str
+    description: Optional[str] = None
+    data_type: Literal['string', 'number', 'boolean', 'document']
+    multiple: bool = False
+    unit: Optional[str] = None
+
+
+class DeviceTypeChannelDefinition(BaseModel):
+    field: str
+    label: Optional[str] = None
+    description: Optional[str] = None
+
+
+class DeviceType(BaseModel):
+    code: str
+    label: str
+    extends: Optional[str] = None
+    is_abstract: bool
+    manufacturer: Optional[str] = None
+    model_number: Optional[str] = None
+    description: Optional[str] = None
+    metadata_fields: list[DeviceTypeMetadataFieldDefinition]
+    channels: list[DeviceTypeChannelDefinition]
+    created_at: datetime
+    updated_at: datetime
+
+
+class ResolvedDeviceType(BaseModel):
+    """Effective schema after merging this type with all ancestors via `extends`."""
+    code: str
+    label: str
+    manufacturer: Optional[str] = None
+    model_number: Optional[str] = None
+    description: Optional[str] = None
+    metadata_fields: list[DeviceTypeMetadataFieldDefinition]
+    channels: list[DeviceTypeChannelDefinition]
+
+
+# ── Device groups ────────────────────────────────────────────────────────────
+
+
+class DeviceGroupAnnotation(BaseModel):
+    """Position of a device within the group's reference image, as normalised [0, 1] coordinates."""
+    device_code: str
+    x: float
+    y: float
+
+    @field_validator('x', 'y')
+    @classmethod
+    def _in_range(cls, v: float) -> float:
+        if not 0.0 <= v <= 1.0:
+            raise ValueError('annotation coordinate must be between 0 and 1')
+        return v
+
+
+class DeviceGroup(BaseModel):
+    code: str
+    project: str
+    label: str
+    description: Optional[str] = None
+    region: Optional[list[tuple[float, float]]] = None
+    reference_document_code: Optional[str] = None
+    annotations: Optional[list[DeviceGroupAnnotation]] = None
+    devices: list[str]
+    created_at: datetime
+    updated_at: datetime
+
+
+# ── Documents ────────────────────────────────────────────────────────────────
+
+
+class MediaPreview(BaseModel):
+    width: int
+    height: int
+    thumbnail_url: str
+
+
+class Document(BaseModel):
+    code: str
+    project: str
+    devices: list[str]
+    file_name: str
+    media_type: str
+    size_bytes: int
+    title: Optional[str] = None
+    description: Optional[str] = None
+    tags: list[str]
+    preview: Optional[MediaPreview] = None
+    uploaded_by: str
+    created_at: datetime
+    updated_at: datetime
+    access_url: str
+
+
+# ── Uploads ──────────────────────────────────────────────────────────────────
+
+
+class UploadSession(BaseModel):
+    code: str
+    upload_url: str
+    upload_method: str
+    upload_headers: dict[str, str]
+    expires_at: datetime
+
+
+# ── TypeAdapters ─────────────────────────────────────────────────────────────
+
 _ProjectListAdapter = TypeAdapter(list[Project])
 _DeviceListAdapter = TypeAdapter(list[Device])
+_DeviceTypeListAdapter = TypeAdapter(list[DeviceType])
+_DeviceGroupListAdapter = TypeAdapter(list[DeviceGroup])
+_DocumentListAdapter = TypeAdapter(list[Document])
 
 
 class MercutoAssetService:
@@ -362,3 +483,205 @@ class MercutoAssetService:
 
     def delete_device(self, code: str) -> None:
         self._client.request(f"{self._path}/devices/{code}", 'DELETE')
+
+    # --- Device types routes ---
+
+    def list_device_types(self, limit: int = 100, offset: int = 0) -> list[DeviceType]:
+        params: PayloadType = {'limit': limit, 'offset': offset}
+        r = self._client.request(f"{self._path}/device-types", 'GET', params=params)
+        return _DeviceTypeListAdapter.validate_json(r.text)
+
+    def create_device_type(
+        self,
+        label: str,
+        extends: Optional[str] = None,
+        is_abstract: bool = False,
+        manufacturer: Optional[str] = None,
+        model_number: Optional[str] = None,
+        description: Optional[str] = None,
+        metadata_fields: Optional[list[DeviceTypeMetadataFieldDefinition]] = None,
+        channels: Optional[list[DeviceTypeChannelDefinition]] = None,
+    ) -> DeviceType:
+        payload: PayloadType = {
+            'label': label,
+            'extends': extends,
+            'is_abstract': is_abstract,
+            'manufacturer': manufacturer,
+            'model_number': model_number,
+            'description': description,
+        }
+        payload['metadata_fields'] = [f.model_dump(mode='json') for f in (metadata_fields or [])]  # type: ignore[assignment]
+        payload['channels'] = [c.model_dump(mode='json') for c in (channels or [])]  # type: ignore[assignment]
+        r = self._client.request(f"{self._path}/device-types", 'POST', json=payload)
+        return DeviceType.model_validate_json(r.text)
+
+    def get_device_type(self, code: str, resolved: bool = False) -> DeviceType | ResolvedDeviceType:
+        params: PayloadType = {'resolved': resolved}
+        r = self._client.request(f"{self._path}/device-types/{code}", 'GET', params=params)
+        if resolved:
+            return ResolvedDeviceType.model_validate_json(r.text)
+        return DeviceType.model_validate_json(r.text)
+
+    def update_device_type(
+        self,
+        code: str,
+        label: str,
+        extends: Optional[str] = None,
+        is_abstract: bool = False,
+        manufacturer: Optional[str] = None,
+        model_number: Optional[str] = None,
+        description: Optional[str] = None,
+        metadata_fields: Optional[list[DeviceTypeMetadataFieldDefinition]] = None,
+        channels: Optional[list[DeviceTypeChannelDefinition]] = None,
+    ) -> DeviceType:
+        payload: PayloadType = {
+            'label': label,
+            'extends': extends,
+            'is_abstract': is_abstract,
+            'manufacturer': manufacturer,
+            'model_number': model_number,
+            'description': description,
+        }
+        payload['metadata_fields'] = [f.model_dump(mode='json') for f in (metadata_fields or [])]  # type: ignore[assignment]
+        payload['channels'] = [c.model_dump(mode='json') for c in (channels or [])]  # type: ignore[assignment]
+        r = self._client.request(f"{self._path}/device-types/{code}", 'PUT', json=payload)
+        return DeviceType.model_validate_json(r.text)
+
+    def delete_device_type(self, code: str) -> None:
+        self._client.request(f"{self._path}/device-types/{code}", 'DELETE')
+
+    # --- Device groups routes ---
+
+    def list_device_groups(self, project: str, limit: int = 100, offset: int = 0) -> list[DeviceGroup]:
+        params: PayloadType = {'project': project, 'limit': limit, 'offset': offset}
+        r = self._client.request(f"{self._path}/device-groups", 'GET', params=params)
+        return _DeviceGroupListAdapter.validate_json(r.text)
+
+    def create_device_group(
+        self,
+        project: str,
+        label: str,
+        description: Optional[str] = None,
+        region: Optional[list[tuple[float, float]]] = None,
+        reference_document_code: Optional[str] = None,
+        annotations: Optional[list[DeviceGroupAnnotation]] = None,
+        devices: Optional[list[str]] = None,
+    ) -> DeviceGroup:
+        payload: PayloadType = {
+            'project': project,
+            'label': label,
+            'description': description,
+            'reference_document_code': reference_document_code,
+            'devices': devices or [],
+        }
+        payload['region'] = region  # type: ignore[assignment]
+        if annotations is not None:
+            payload['annotations'] = [a.model_dump(mode='json') for a in annotations]  # type: ignore[assignment]
+        r = self._client.request(f"{self._path}/device-groups", 'POST', json=payload)
+        return DeviceGroup.model_validate_json(r.text)
+
+    def get_device_group(self, code: str) -> DeviceGroup:
+        r = self._client.request(f"{self._path}/device-groups/{code}", 'GET')
+        return DeviceGroup.model_validate_json(r.text)
+
+    def update_device_group(
+        self,
+        code: str,
+        label: str,
+        description: Optional[str] = None,
+        region: Optional[list[tuple[float, float]]] = None,
+        reference_document_code: Optional[str] = None,
+        annotations: Optional[list[DeviceGroupAnnotation]] = None,
+        devices: Optional[list[str]] = None,
+    ) -> DeviceGroup:
+        payload: PayloadType = {
+            'label': label,
+            'description': description,
+            'reference_document_code': reference_document_code,
+            'devices': devices or [],
+        }
+        payload['region'] = region  # type: ignore[assignment]
+        if annotations is not None:
+            payload['annotations'] = [a.model_dump(mode='json') for a in annotations]  # type: ignore[assignment]
+        r = self._client.request(f"{self._path}/device-groups/{code}", 'PUT', json=payload)
+        return DeviceGroup.model_validate_json(r.text)
+
+    def delete_device_group(self, code: str) -> None:
+        self._client.request(f"{self._path}/device-groups/{code}", 'DELETE')
+
+    # --- Documents routes ---
+
+    def list_documents(
+        self,
+        project: str,
+        device: Optional[str] = None,
+        tag: Optional[list[str]] = None,
+        limit: int = 100,
+        offset: int = 0,
+    ) -> list[Document]:
+        params: PayloadType = {'project': project, 'limit': limit, 'offset': offset}
+        if device is not None:
+            params['device'] = device
+        if tag:
+            params['tag'] = tag  # type: ignore[assignment]
+        r = self._client.request(f"{self._path}/documents", 'GET', params=params)
+        return _DocumentListAdapter.validate_json(r.text)
+
+    def get_document(self, code: str) -> Document:
+        r = self._client.request(f"{self._path}/documents/{code}", 'GET')
+        return Document.model_validate_json(r.text)
+
+    def update_document(
+        self,
+        code: str,
+        devices: Optional[list[str]] = None,
+        title: Optional[str] = None,
+        description: Optional[str] = None,
+        tags: Optional[list[str]] = None,
+    ) -> Document:
+        payload: PayloadType = {
+            'devices': devices or [],
+            'title': title,
+            'description': description,
+            'tags': tags or [],
+        }
+        r = self._client.request(f"{self._path}/documents/{code}", 'PUT', json=payload)
+        return Document.model_validate_json(r.text)
+
+    def delete_document(self, code: str) -> None:
+        self._client.request(f"{self._path}/documents/{code}", 'DELETE')
+
+    # --- Uploads routes ---
+
+    def initiate_upload(
+        self,
+        project: str,
+        file_name: str,
+        media_type: str,
+        size_bytes: int,
+        devices: Optional[list[str]] = None,
+        title: Optional[str] = None,
+        description: Optional[str] = None,
+        tags: Optional[list[str]] = None,
+    ) -> UploadSession:
+        payload: PayloadType = {
+            'project': project,
+            'file_name': file_name,
+            'media_type': media_type,
+            'size_bytes': size_bytes,
+            'devices': devices or [],
+            'title': title,
+            'description': description,
+            'tags': tags or [],
+        }
+        r = self._client.request(f"{self._path}/uploads", 'POST', json=payload)
+        return UploadSession.model_validate_json(r.text)
+
+    def get_upload_state(self, code: str) -> str:
+        """Returns the upload session state: 'pending' or 'expired'."""
+        r = self._client.request(f"{self._path}/uploads/{code}", 'GET')
+        return r.json()['state']
+
+    def complete_upload(self, code: str) -> Document:
+        r = self._client.request(f"{self._path}/uploads/{code}/complete", 'POST')
+        return Document.model_validate_json(r.text)
