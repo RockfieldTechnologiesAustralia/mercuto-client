@@ -1,6 +1,7 @@
 from datetime import datetime
 from typing import TYPE_CHECKING, Any, Literal, Optional
 
+import requests as _requests
 from pydantic import Field, TypeAdapter, field_validator
 
 if TYPE_CHECKING:
@@ -645,35 +646,37 @@ class MercutoAssetService:
 
     # --- Uploads routes ---
 
-    def initiate_upload(
+    def upload_document(
         self,
         project: str,
         file_name: str,
         media_type: str,
-        size_bytes: int,
+        data: bytes,
         devices: Optional[list[str]] = None,
         title: Optional[str] = None,
         description: Optional[str] = None,
         tags: Optional[list[str]] = None,
-    ) -> UploadSession:
+    ) -> Document:
+        """Initiate an upload session, PUT the file bytes to the pre-signed URL, then complete."""
         payload: PayloadType = {
             'project': project,
             'file_name': file_name,
             'media_type': media_type,
-            'size_bytes': size_bytes,
+            'size_bytes': len(data),
             'devices': devices or [],
             'title': title,
             'description': description,
             'tags': tags or [],
         }
         r = self._client.request(f"{self._path}/uploads", 'POST', json=payload)
-        return UploadSession.model_validate_json(r.text)
+        session = UploadSession.model_validate_json(r.text)
 
-    def get_upload_state(self, code: str) -> str:
-        """Returns the upload session state: 'pending' or 'expired'."""
-        r = self._client.request(f"{self._path}/uploads/{code}", 'GET')
-        return r.json()['state']
+        _requests.request(
+            method=session.upload_method,
+            url=session.upload_url,
+            headers=session.upload_headers,
+            data=data,
+        ).raise_for_status()
 
-    def complete_upload(self, code: str) -> Document:
-        r = self._client.request(f"{self._path}/uploads/{code}/complete", 'POST')
+        r = self._client.request(f"{self._path}/uploads/{session.code}/complete", 'POST')
         return Document.model_validate_json(r.text)
