@@ -331,8 +331,7 @@ class MercutoEventService:
             'end_time': end_time.isoformat(),
         }
         if tags is not None:
-            body['tags'] = [t.model_dump(mode='json')
-                            for t in tags]  # type: ignore[assignment]
+            body['tags'] = [t.model_dump(mode='json') for t in tags]  # type: ignore[assignment]
         r = self._client.request(f"{self._path}/details", "POST", json=body)
         return Event.model_validate_json(r.text)
 
@@ -359,8 +358,7 @@ class MercutoEventService:
         if end_time is not None:
             body['end_time'] = end_time.isoformat()
         if tags is not None:
-            body['tags'] = [t.model_dump(mode='json')
-                            for t in tags]  # type: ignore[assignment]
+            body['tags'] = [t.model_dump(mode='json') for t in tags]  # type: ignore[assignment]
         r = self._client.request(
             f"{self._path}/details/{event}", "PATCH", json=body)
         return Event.model_validate_json(r.text)
@@ -459,9 +457,7 @@ class MercutoEventService:
 
     def calibrate(self, config_id: int,
                   vehicles: list[CalibrationVehicle]) -> CalibrationStatus:
-        # type: ignore[dict-item]
-        body: PayloadType = {'vehicles': [
-            v.model_dump(mode='json') for v in vehicles]}
+        body: PayloadType = {'vehicles': [v.model_dump(mode='json') for v in vehicles]}  # type: ignore[dict-item]
         r = self._client.request(
             f"{self._path}/processing/{config_id}/calibrate", "POST", json=body)
         return CalibrationStatus.model_validate_json(r.text)

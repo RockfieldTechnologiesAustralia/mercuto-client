@@ -15,8 +15,8 @@ from ._authentication import (IAuthenticationMethod,
                               create_authentication_method)
 from .exceptions import MercutoClientException, MercutoHTTPException
 from .modules.alerts import MercutoAlertService
+from .modules.assets import MercutoAssetService
 from .modules.connect import MercutoConnectService
-from .modules.core import MercutoCoreService
 from .modules.data import MercutoDataService
 from .modules.events import MercutoEventService
 from .modules.fatigue import MercutoFatigueService
@@ -214,9 +214,6 @@ class MercutoClient:
     def data(self) -> 'MercutoDataService':
         return self._add_and_fetch_module('data', MercutoDataService)
 
-    def core(self) -> 'MercutoCoreService':
-        return self._add_and_fetch_module('core', MercutoCoreService)
-
     def media(self) -> 'MercutoMediaService':
         return self._add_and_fetch_module('media', MercutoMediaService)
 
@@ -228,6 +225,9 @@ class MercutoClient:
 
     def alerts(self) -> 'MercutoAlertService':
         return self._add_and_fetch_module('alerts', MercutoAlertService)
+
+    def assets(self) -> 'MercutoAssetService':
+        return self._add_and_fetch_module('assets', MercutoAssetService)
 
     def events(self) -> 'MercutoEventService':
         return self._add_and_fetch_module('events', MercutoEventService)

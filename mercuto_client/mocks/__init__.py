@@ -15,6 +15,7 @@ def mock_mercuto(data: bool = True,
                  notifications: bool = True,
                  connect: bool = True,
                  events: bool = True,
+                 assets: bool = True,
                  verify_service_token: Optional[Callable[[str], VerifyMyPermissions]] = None) -> Iterator[None]:
     """
     While this context is active, all calls to MercutoClient will use mocked services.
@@ -42,6 +43,8 @@ def mock_mercuto(data: bool = True,
             stack.enter_context(mock_connect_module())
         if events:
             stack.enter_context(mock_events_module())
+        if assets:
+            stack.enter_context(mock_assets_module())
         yield
 
 
@@ -212,3 +215,24 @@ def mock_events_module() -> Iterator[None]:
         yield
     finally:
         setattr(MercutoClient, 'events', original)
+
+
+@contextlib.contextmanager
+def mock_assets_module() -> Iterator[None]:
+    from .mock_assets import MockMercutoAssetService
+    original = MercutoClient.assets
+
+    _cache: Optional[MockMercutoAssetService] = None
+
+    def stub(self: MercutoClient) -> MockMercutoAssetService:
+        nonlocal _cache
+        if _cache is None:
+            _cache = MockMercutoAssetService(self)
+        _cache._client = self
+        return _cache
+
+    try:
+        setattr(MercutoClient, 'assets', stub)
+        yield
+    finally:
+        setattr(MercutoClient, 'assets', original)
