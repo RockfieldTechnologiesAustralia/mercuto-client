@@ -23,8 +23,8 @@ class MockMercutoAssetService(MercutoAssetService, metaclass=EnforceOverridesMet
     def healthcheck(self) -> Healthcheck:
         return Healthcheck(status='ok')
 
-    def ping_project(self, code: str, ip_address: str) -> None:
-        self.get_project(code)
+    def ping_project(self, project: str, ip_address: str) -> None:
+        self.get_project(project)
         try:
             ipaddress.ip_address(ip_address)
         except ValueError as exc:

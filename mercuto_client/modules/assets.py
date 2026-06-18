@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import TYPE_CHECKING, Any, Literal, Optional
 
-from pydantic import Field, TypeAdapter, field_validator, model_validator
+from pydantic import Field, TypeAdapter, field_validator
 
 if TYPE_CHECKING:
     from ..client import MercutoClient
@@ -38,25 +38,17 @@ class DeviceChannel(BaseModel):
 
 
 class MetadataEntry(BaseModel):
-    data_type: str
+    data_type: Literal["string", "number", "boolean", "document"]
     is_list: bool = False
     value: str | int | float | bool | None = None
-    values: list[str | int | float | bool] | None = None
+    values: list[str] | list[int] | list[float] | list[bool] | None = None
 
-    @model_validator(mode='after')
-    def validate_value_shape(self) -> 'MetadataEntry':
-        if self.is_list:
-            if self.values is None:
-                raise ValueError("`values` is required when `is_list` is true")
-            if self.value is not None:
-                raise ValueError("`value` must be null when `is_list` is true")
+    @classmethod
+    def string(cls, value: str | list[str]) -> 'MetadataEntry':
+        if isinstance(value, str):
+            return cls(data_type='string', value=value)
         else:
-            if self.value is None:
-                raise ValueError("`value` is required when `is_list` is false")
-            if self.values is not None:
-                raise ValueError(
-                    "`values` must be null when `is_list` is false")
-        return self
+            return cls(data_type='string', is_list=True, values=value)
 
 
 class Device(BaseModel):
@@ -289,10 +281,10 @@ class MercutoAssetService:
         r = self._client.request(f"{self._path}/healthcheck", 'GET')
         return Healthcheck.model_validate_json(r.text)
 
-    def ping_project(self, code: str, ip_address: str) -> None:
+    def ping_project(self, project: str, ip_address: str) -> None:
         payload: PayloadType = {'ip_address': ip_address}
         self._client.request(
-            f"{self._path}/projects/{code}/ping", 'POST', json=payload)
+            f"{self._path}/projects/{project}/ping", 'POST', json=payload)
 
     # --- Display routes ---
 
