@@ -1,11 +1,11 @@
 import logging
 import uuid
 from datetime import datetime
-from typing import Any, Optional
+from typing import Optional
 
 from ..client import MercutoClient
 from ..exceptions import MercutoHTTPException
-from ..modules.events import Event, Tag
+from ..modules.events import Axle, EditVehicleIn, Event, Tag, Vehicle
 
 logger = logging.getLogger(__name__)
 
@@ -47,6 +47,7 @@ class MockMercutoEventService:
             code=code,
             start_time=start_time,
             end_time=end_time,
+            user_edited=False,
             tags=tags or [],
             vehicles=[],
             artifacts=[],
@@ -67,20 +68,37 @@ class MockMercutoEventService:
         return self._events[event]
 
     def update_event(self, event: str,
-                     start_time: Optional[datetime] = None,
-                     end_time: Optional[datetime] = None,
-                     tags: Optional[list[Tag]] = None) -> Event:
+                     start_time: datetime,
+                     end_time: datetime,
+                     tags: list[Tag],
+                     vehicles: list[EditVehicleIn]) -> Event:
         if event not in self._events:
             raise MercutoHTTPException("Event not found", 404)
         event_model = self._events[event]
-        updates: dict[str, Any] = {}
-        if start_time is not None:
-            updates['start_time'] = start_time
-        if end_time is not None:
-            updates['end_time'] = end_time
-        if tags is not None:
-            updates['tags'] = tags
-        updated = event_model.model_copy(update=updates)
+        new_vehicles = [
+            Vehicle(
+                vehicle_index=v.vehicle_index,
+                velocity_ms=v.velocity_ms,
+                reference_position_m=v.reference_position_m,
+                axles=[
+                    Axle(
+                        axle_index=i,
+                        position_m=0.0,
+                        crossing_time=a.crossing_time,
+                        mass_kg=None,
+                        confidence=None,
+                    )
+                    for i, a in enumerate(v.axles)
+                ],
+            )
+            for v in vehicles
+        ]
+        updated = event_model.model_copy(update={
+            'start_time': start_time,
+            'end_time': end_time,
+            'tags': tags,
+            'vehicles': new_vehicles,
+        })
         self._events[event] = updated
         return updated
 
@@ -90,7 +108,7 @@ class MockMercutoEventService:
         del self._events[event]
 
     def set_event_tag(self, event: str, tag_name: str,
-                      tag_value: Any = None) -> None:
+                      tag_value: str) -> None:
         if event not in self._events:
             raise MercutoHTTPException("Event not found", 404)
         event_model = self._events[event]

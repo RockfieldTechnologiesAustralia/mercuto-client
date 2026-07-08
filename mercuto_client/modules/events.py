@@ -2,7 +2,7 @@ from datetime import datetime, timedelta
 from enum import Enum
 from typing import TYPE_CHECKING, Any, Literal, Optional
 
-from pydantic import TypeAdapter
+from pydantic import AwareDatetime, TypeAdapter
 
 if TYPE_CHECKING:
     from ..client import MercutoClient
@@ -15,7 +15,7 @@ EventDetectorType = Literal['cron', 'generic']
 
 
 class CronDetectorConfig(BaseModel):
-    cron_expression: str
+    cron_expression: str = '*/15 * * * *'
     detector_type: Literal['cron'] = 'cron'
 
 
@@ -29,16 +29,24 @@ class GenericDetectorConfig(BaseModel):
 
 class Tag(BaseModel):
     tag_name: str
-    tag_value: str | list[Any] | dict[str, Any] | int | float | bool | None
+    tag_value: str
+
+
+class Axle(BaseModel):
+    axle_index: int
+    position_m: float
+    crossing_time: datetime
+    mass_kg: Optional[float] = None
+    confidence: Optional[float] = None
 
 
 class Vehicle(BaseModel):
     vehicle_index: int
     classification: Optional[str] = None
     velocity_ms: Optional[float] = None
-    axle_positions: list[float]
-    axle_masses_kg: list[float]
+    reference_position_m: Optional[float] = None
     gross_vehicle_mass_kg: Optional[float] = None
+    axles: list[Axle]
 
 
 class Artifact(BaseModel):
@@ -51,11 +59,23 @@ class Artifact(BaseModel):
     vehicle_index: Optional[int] = None
 
 
+class EditAxleIn(BaseModel):
+    crossing_time: AwareDatetime
+
+
+class EditVehicleIn(BaseModel):
+    vehicle_index: int
+    velocity_ms: float
+    reference_position_m: float = 0.0
+    axles: list[EditAxleIn]
+
+
 class Event(BaseModel):
     project: str
     code: str
     start_time: datetime
     end_time: datetime
+    user_edited: bool
     tags: list[Tag]
     vehicles: list[Vehicle]
     artifacts: list[Artifact]
@@ -63,8 +83,8 @@ class Event(BaseModel):
 
 class EventStatus(BaseModel):
     service: str
-    status: Literal['completed', 'failed']
-    message: str | None
+    status: Literal['pending', 'completed', 'failed']
+    message: str | None = None
     updated_at: datetime
 
 
@@ -229,17 +249,17 @@ class CalibrationStatus(BaseModel):
 
 # ── Reprocessing ─────────────────────────────────────────
 
+JobStatus = Literal['IN_PROGRESS', 'COMPLETED', 'FAILED', 'CANCELLED']
+
 
 class ServiceProgress(BaseModel):
-    last_completed_index: int = 0
     last_completed_event: Optional[str] = None
     completed_count: int = 0
     updated_at: Optional[datetime] = None
 
 
 class FailedEvent(BaseModel):
-    event: str
-    index: int
+    event_code: str
     message: Optional[str] = None
     failed_at: datetime
 
@@ -251,9 +271,8 @@ class ReprocessingJob(BaseModel):
     requested_at: datetime
     time_range_start: datetime
     time_range_end: datetime
-    status: str
+    status: JobStatus
     total_events: int
-    events: list[str]
     progress: dict[str, ServiceProgress] = {}
     failed_events: dict[str, list[FailedEvent]] = {}
 
@@ -265,9 +284,10 @@ class ReprocessingJobSummary(BaseModel):
     requested_at: datetime
     time_range_start: datetime
     time_range_end: datetime
-    status: str
+    status: JobStatus
     total_events: int
     progress: dict[str, ServiceProgress] = {}
+    failed_events: dict[str, list[FailedEvent]] = {}
 
 
 # --- TypeAdapters for lists ---
@@ -349,32 +369,34 @@ class MercutoEventService:
         return Event.model_validate_json(r.text)
 
     def update_event(self, event: str,
-                     start_time: Optional[datetime] = None,
-                     end_time: Optional[datetime] = None,
-                     tags: Optional[list[Tag]] = None) -> Event:
-        body: PayloadType = {}
-        if start_time is not None:
-            body['start_time'] = start_time.isoformat()
-        if end_time is not None:
-            body['end_time'] = end_time.isoformat()
-        if tags is not None:
-            body['tags'] = [t.model_dump(mode='json') for t in tags]  # type: ignore[assignment]
+                     start_time: datetime,
+                     end_time: datetime,
+                     tags: list[Tag],
+                     vehicles: list[EditVehicleIn]) -> Event:
+        body: PayloadType = {
+            'start_time': start_time.isoformat(),
+            'end_time': end_time.isoformat(),
+            'tags': [t.model_dump(mode='json') for t in tags],  # type: ignore[dict-item]
+            'vehicles': [v.model_dump(mode='json') for v in vehicles],  # type: ignore[dict-item]
+        }
         r = self._client.request(
-            f"{self._path}/details/{event}", "PATCH", json=body)
+            f"{self._path}/details/{event}", "PUT", json=body)
         return Event.model_validate_json(r.text)
 
     def delete_event(self, event: str) -> None:
         self._client.request(f"{self._path}/details/{event}", "DELETE")
 
     def set_event_tag(self, event: str, tag_name: str,
-                      tag_value: Any = None) -> None:
+                      tag_value: str) -> None:
         body: PayloadType = {'tag_name': tag_name, 'tag_value': tag_value}
         self._client.request(
             f"{self._path}/details/{event}/tags", "PATCH", json=body)
 
-    def reprocess_event(self, event: str) -> ReprocessingJob:
+    def reprocess_event(self, event: str,
+                        override_user_data: bool = False) -> ReprocessingJob:
+        params: PayloadType = {'override_user_data': override_user_data}
         r = self._client.request(
-            f"{self._path}/details/{event}/reprocess", "POST")
+            f"{self._path}/details/{event}/reprocess", "POST", params=params)
         return ReprocessingJob.model_validate_json(r.text)
 
     def get_next_event(self, event: str, direction: str, step: int = 1) -> Event:
@@ -466,11 +488,13 @@ class MercutoEventService:
 
     def create_reprocessing_job(self, project: str,
                                 time_range_start: datetime,
-                                time_range_end: datetime) -> ReprocessingJob:
+                                time_range_end: datetime,
+                                override_user_data: bool = False) -> ReprocessingJob:
         body: PayloadType = {
             'project': project,
             'time_range_start': time_range_start.isoformat(),
             'time_range_end': time_range_end.isoformat(),
+            'override_user_data': override_user_data,
         }
         r = self._client.request(
             f"{self._path}/reprocessing/jobs", "POST", json=body)
