@@ -107,14 +107,11 @@ class MockMercutoEventService:
             raise MercutoHTTPException("Event not found", 404)
         del self._events[event]
 
-    def set_event_tag(self, event: str, tag_name: str,
-                      tag_value: str) -> None:
+    def replace_event_tags(self, event: str, tags: list[Tag]) -> None:
         if event not in self._events:
             raise MercutoHTTPException("Event not found", 404)
         event_model = self._events[event]
-        tags = [t for t in event_model.tags if t.tag_name != tag_name]
-        tags.append(Tag(tag_name=tag_name, tag_value=tag_value))
-        self._events[event] = event_model.model_copy(update={'tags': tags})
+        self._events[event] = event_model.model_copy(update={'tags': list(tags)})
 
     def get_next_event(self, event: str, direction: str, step: int = 1) -> Event:
         if event not in self._events:

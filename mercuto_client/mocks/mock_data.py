@@ -438,7 +438,10 @@ class MockMercutoDataService(MercutoDataService, metaclass=EnforceOverridesMeta)
                            value_name='value').sort_index()
         frame.index.name = 'timestamp'
         frame = frame.reset_index().set_index(['channel', 'timestamp'])
-        self._secondary_and_primary_buffer = pd.concat([self._secondary_and_primary_buffer, frame]).sort_index()
+        if len(self._secondary_and_primary_buffer) == 0:
+            self._secondary_and_primary_buffer = frame.sort_index()
+        else:
+            self._secondary_and_primary_buffer = pd.concat([self._secondary_and_primary_buffer, frame]).sort_index()
         self._update_last_valid_samples()
 
     def get_latest_samples(self, project: str, include_primary: bool = True) -> list[LatestDataSample]:

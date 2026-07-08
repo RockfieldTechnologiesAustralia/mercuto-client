@@ -386,11 +386,12 @@ class MercutoEventService:
     def delete_event(self, event: str) -> None:
         self._client.request(f"{self._path}/details/{event}", "DELETE")
 
-    def set_event_tag(self, event: str, tag_name: str,
-                      tag_value: str) -> None:
-        body: PayloadType = {'tag_name': tag_name, 'tag_value': tag_value}
+    def replace_event_tags(self, event: str, tags: list[Tag]) -> None:
+        body: PayloadType = {
+            'tags': [t.model_dump(mode='json') for t in tags],  # type: ignore[dict-item]
+        }
         self._client.request(
-            f"{self._path}/details/{event}/tags", "PATCH", json=body)
+            f"{self._path}/details/{event}/tags", "PUT", json=body)
 
     def reprocess_event(self, event: str,
                         override_user_data: bool = False) -> ReprocessingJob:
