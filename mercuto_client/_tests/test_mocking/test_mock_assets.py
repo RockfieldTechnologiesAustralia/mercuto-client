@@ -8,12 +8,12 @@ from ...modules.assets import DeviceChannel, MetadataEntry
 def test_healthcheck_and_ping(client: MercutoClient) -> None:
     project = client.assets().create_project(tenant='tenant-a', name='Bridge A')
     health = client.assets().healthcheck()
-    client.assets().ping_project(code=project.code, ip_address='1.2.3.4')
+    client.assets().ping_project(project=project.code, ip_address='1.2.3.4')
 
     assert health.status == 'ok'
 
     with pytest.raises(MercutoHTTPException, match='valid IP'):
-        client.assets().ping_project(code=project.code, ip_address='not-an-ip')
+        client.assets().ping_project(project=project.code, ip_address='not-an-ip')
 
 
 def test_project_crud(client: MercutoClient) -> None:

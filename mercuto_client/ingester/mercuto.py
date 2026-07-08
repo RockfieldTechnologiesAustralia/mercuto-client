@@ -7,7 +7,7 @@ from typing import Optional
 import pytz
 
 from .. import MercutoClient, MercutoHTTPException
-from ..modules.core import Project
+from ..modules.assets import Project
 from ..modules.data import (Channel, ChannelClassification, Datatable,
                             SecondaryDataSample)
 from ..modules.media import Camera
@@ -58,7 +58,7 @@ class MercutoIngester:
 
     def _refresh_mercuto_data(self) -> None:
         with self._client.as_credentials(api_key=self._api_key) as client:
-            self._project = client.core().get_project(self._project_code)
+            self._project = client.assets().get_project(self._project_code)
             assert self._project.code == self._project_code
 
             self._secondary_channels = client.data().list_channels(self._project_code, classification=ChannelClassification.SECONDARY)
@@ -88,7 +88,7 @@ class MercutoIngester:
         """
         ip = get_my_public_ip()
         with self._client.as_credentials(api_key=self._api_key) as client:
-            client.core().ping_project(self.project_code, ip_address=ip)
+            client.assets().ping_project(self.project_code, ip_address=ip)
             logging.info(f"Pinged Mercuto server from IP: {ip} for project: {self.project_code}")
 
     def matching_datatable(self, filename: str) -> str | None:
