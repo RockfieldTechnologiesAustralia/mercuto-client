@@ -14,6 +14,7 @@ from urllib3.util.retry import Retry
 from ._authentication import (IAuthenticationMethod,
                               create_authentication_method)
 from .exceptions import MercutoClientException, MercutoHTTPException
+from .modules.actions import MercutoActionService
 from .modules.alerts import MercutoAlertService
 from .modules.assets import MercutoAssetService
 from .modules.connect import MercutoConnectService
@@ -231,6 +232,9 @@ class MercutoClient:
 
     def events(self) -> 'MercutoEventService':
         return self._add_and_fetch_module('events', MercutoEventService)
+
+    def actions(self) -> 'MercutoActionService':
+        return self._add_and_fetch_module('actions', MercutoActionService)
 
     def connectivity(self) -> 'MercutoConnectService':
         return self._add_and_fetch_module('connect', MercutoConnectService)

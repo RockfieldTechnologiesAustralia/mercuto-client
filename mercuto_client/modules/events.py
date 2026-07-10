@@ -10,6 +10,11 @@ if TYPE_CHECKING:
 from . import PayloadType
 from ._util import BaseModel
 
+
+class Healthcheck(BaseModel):
+    status: str
+
+
 # ── Events ───────────────────────────────────────────────
 EventDetectorType = Literal['cron', 'generic']
 
@@ -319,6 +324,10 @@ class MercutoEventService:
     def __init__(self, client: 'MercutoClient', path: str = '/v2/events') -> None:
         self._client = client
         self._path = path
+
+    def healthcheck(self) -> Healthcheck:
+        r = self._client.request(f"{self._path}/healthcheck", "GET")
+        return Healthcheck.model_validate_json(r.text)
 
     # ── Events ───────────────────────────────────────────
 
