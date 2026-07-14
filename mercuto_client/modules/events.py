@@ -97,7 +97,7 @@ class EventStatus(BaseModel):
 
 
 class DetectorSettings(BaseModel):
-    id: int
+    code: str
     project: str
     enabled: bool
     config: CronDetectorConfig | GenericDetectorConfig
