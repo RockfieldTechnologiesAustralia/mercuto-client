@@ -169,33 +169,33 @@ class DeviceTypeMetadataFieldDefinition(BaseModel):
 
 class DeviceTypeChannelDefinition(BaseModel):
     field: str
-    label: Optional[str] = None
     description: Optional[str] = None
+    channel_label_template: Optional[str] = None
+
+
+class DeviceTypeChildSpec(BaseModel):
+    allowed_device_types: list[str] = []
+    required_metadata: list[str] = []
+    required_channel_labels: list[str] = []
+    max_count: Optional[int] = None
+
+
+class DeviceTypeTemplate(BaseModel):
+    version: Literal[1] = 1
+    metadata: list[DeviceTypeMetadataFieldDefinition] = []
+    channels: list[DeviceTypeChannelDefinition] = []
+    children: list[DeviceTypeChildSpec] = []
 
 
 class DeviceType(BaseModel):
     code: str
     label: str
-    extends: Optional[str] = None
-    is_abstract: bool
     manufacturer: Optional[str] = None
     model_number: Optional[str] = None
     description: Optional[str] = None
-    metadata_fields: list[DeviceTypeMetadataFieldDefinition]
-    channels: list[DeviceTypeChannelDefinition]
+    template: DeviceTypeTemplate
     created_at: datetime
     updated_at: datetime
-
-
-class ResolvedDeviceType(BaseModel):
-    """Effective schema after merging this type with all ancestors via `extends`."""
-    code: str
-    label: str
-    manufacturer: Optional[str] = None
-    model_number: Optional[str] = None
-    description: Optional[str] = None
-    metadata_fields: list[DeviceTypeMetadataFieldDefinition]
-    channels: list[DeviceTypeChannelDefinition]
 
 
 # ── Device groups ────────────────────────────────────────────────────────────
@@ -492,56 +492,41 @@ class MercutoAssetService:
     def create_device_type(
         self,
         label: str,
-        extends: Optional[str] = None,
-        is_abstract: bool = False,
         manufacturer: Optional[str] = None,
         model_number: Optional[str] = None,
         description: Optional[str] = None,
-        metadata_fields: Optional[list[DeviceTypeMetadataFieldDefinition]] = None,
-        channels: Optional[list[DeviceTypeChannelDefinition]] = None,
+        template: Optional[DeviceTypeTemplate] = None,
     ) -> DeviceType:
         payload: PayloadType = {
             'label': label,
-            'extends': extends,
-            'is_abstract': is_abstract,
             'manufacturer': manufacturer,
             'model_number': model_number,
             'description': description,
         }
-        payload['metadata_fields'] = [f.model_dump(mode='json') for f in (metadata_fields or [])]  # type: ignore[assignment]
-        payload['channels'] = [c.model_dump(mode='json') for c in (channels or [])]  # type: ignore[assignment]
+        payload['template'] = (template or DeviceTypeTemplate()).model_dump(mode='json')  # type: ignore[assignment]
         r = self._client.request(f"{self._path}/device-types", 'POST', json=payload)
         return DeviceType.model_validate_json(r.text)
 
-    def get_device_type(self, code: str, resolved: bool = False) -> DeviceType | ResolvedDeviceType:
-        params: PayloadType = {'resolved': resolved}
-        r = self._client.request(f"{self._path}/device-types/{code}", 'GET', params=params)
-        if resolved:
-            return ResolvedDeviceType.model_validate_json(r.text)
+    def get_device_type(self, code: str) -> DeviceType:
+        r = self._client.request(f"{self._path}/device-types/{code}", 'GET')
         return DeviceType.model_validate_json(r.text)
 
     def update_device_type(
         self,
         code: str,
         label: str,
-        extends: Optional[str] = None,
-        is_abstract: bool = False,
         manufacturer: Optional[str] = None,
         model_number: Optional[str] = None,
         description: Optional[str] = None,
-        metadata_fields: Optional[list[DeviceTypeMetadataFieldDefinition]] = None,
-        channels: Optional[list[DeviceTypeChannelDefinition]] = None,
+        template: Optional[DeviceTypeTemplate] = None,
     ) -> DeviceType:
         payload: PayloadType = {
             'label': label,
-            'extends': extends,
-            'is_abstract': is_abstract,
             'manufacturer': manufacturer,
             'model_number': model_number,
             'description': description,
         }
-        payload['metadata_fields'] = [f.model_dump(mode='json') for f in (metadata_fields or [])]  # type: ignore[assignment]
-        payload['channels'] = [c.model_dump(mode='json') for c in (channels or [])]  # type: ignore[assignment]
+        payload['template'] = (template or DeviceTypeTemplate()).model_dump(mode='json')  # type: ignore[assignment]
         r = self._client.request(f"{self._path}/device-types/{code}", 'PUT', json=payload)
         return DeviceType.model_validate_json(r.text)
 
