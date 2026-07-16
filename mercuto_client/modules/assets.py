@@ -37,6 +37,7 @@ class Project(BaseModel):
 class DeviceChannel(BaseModel):
     field: str
     channel: str
+    field_in_template: Optional[str] = None
 
 
 class MetadataEntry(BaseModel):
@@ -193,6 +194,7 @@ class DeviceType(BaseModel):
     manufacturer: Optional[str] = None
     model_number: Optional[str] = None
     description: Optional[str] = None
+    icon: Optional[str] = None
     template: DeviceTypeTemplate
     created_at: datetime
     updated_at: datetime
