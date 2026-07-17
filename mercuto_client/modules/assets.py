@@ -173,6 +173,12 @@ class DeviceTypeChannelDefinition(BaseModel):
     description: Optional[str] = None
 
 
+class DeviceTypeChildSpecRequiredMetadataField(BaseModel):
+    key: str
+    data_type: Literal['string', 'number', 'boolean', 'document'] = 'string'
+    multiple: bool = False
+
+
 class DeviceTypeReadingSlot(BaseModel):
     key: str
     description: Optional[str] = None
@@ -182,7 +188,7 @@ class DeviceTypeReadingSlot(BaseModel):
 
 class DeviceTypeChildSpec(BaseModel):
     allowed_device_types: list[str] = []
-    required_metadata: list[str] = []
+    required_metadata: list[DeviceTypeChildSpecRequiredMetadataField] = []
     reading_slots: list[DeviceTypeReadingSlot] = []
     max_count: Optional[int] = None
 
