@@ -37,7 +37,7 @@ class Project(BaseModel):
 class DeviceChannel(BaseModel):
     field: str
     channel: str
-    field_in_template: Optional[str] = None
+    source_slot: Optional[str] = None
 
 
 class MetadataEntry(BaseModel):
@@ -171,13 +171,19 @@ class DeviceTypeMetadataFieldDefinition(BaseModel):
 class DeviceTypeChannelDefinition(BaseModel):
     field: str
     description: Optional[str] = None
-    channel_label_template: Optional[str] = None
+
+
+class DeviceTypeReadingSlot(BaseModel):
+    key: str
+    description: Optional[str] = None
+    channel_label_template: str
+    required: bool = True
 
 
 class DeviceTypeChildSpec(BaseModel):
     allowed_device_types: list[str] = []
     required_metadata: list[str] = []
-    required_channel_labels: list[str] = []
+    reading_slots: list[DeviceTypeReadingSlot] = []
     max_count: Optional[int] = None
 
 
@@ -185,6 +191,7 @@ class DeviceTypeTemplate(BaseModel):
     version: Literal[1] = 1
     metadata: list[DeviceTypeMetadataFieldDefinition] = []
     channels: list[DeviceTypeChannelDefinition] = []
+    reading_slots: list[DeviceTypeReadingSlot] = []
     children: list[DeviceTypeChildSpec] = []
 
 
