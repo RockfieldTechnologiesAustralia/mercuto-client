@@ -185,13 +185,35 @@ class CalibrationVehicle(BaseModel):
     known_velocity_kmh: float
 
 
+class AxleSpacingComparison(BaseModel):
+    known_m: float
+    detected_m: float
+    error_m: float
+
+
+class AxleCalibrationResult(BaseModel):
+    measurement: float
+    kg_per_strain: Optional[float] = None
+
+
+class CalibrationEventResult(BaseModel):
+    event_code: str
+    estimated_velocity_kmh: float
+    velocity_error_kmh: float
+    axle_spacings: list[AxleSpacingComparison]
+    axle_results: list[AxleCalibrationResult]
+    raw_strain_measurement: float
+    derived_kg_per_strain: float
+
+
 class CalibrationMetadata(BaseModel):
     status: Literal['processing', 'completed', 'failed']
     requested_at: datetime
     status_message: Optional[str] = None
     calibrated_at: Optional[datetime] = None
-    vehicles: list[CalibrationVehicle] = []
-    kg_per_strain: Optional[float] = None
+    calibration_vehicles: list[CalibrationVehicle] = []
+    computed_calibration_events: list[CalibrationEventResult] = []
+    optimal_kg_per_strain: Optional[float] = None
     report_url: Optional[str] = None
 
 
@@ -217,34 +239,6 @@ class ProcessingConfig(BaseModel):
     project: str
     enabled: bool
     config: ProcessingConfigBody
-
-
-class AxleSpacingComparison(BaseModel):
-    known_m: float
-    detected_m: float
-    error_m: float
-
-
-class AxleCalibrationResult(BaseModel):
-    measurement: float
-    kg_per_strain: Optional[float] = None
-
-
-class CalibrationEventResult(BaseModel):
-    event_code: str
-    known_velocity_kmh: float
-    estimated_velocity_kmh: float
-    velocity_error_kmh: float
-    axle_spacings: list[AxleSpacingComparison]
-    axle_results: list[AxleCalibrationResult]
-    raw_strain_measurement: float
-    derived_kg_per_strain: float
-
-
-class CalibrationResult(BaseModel):
-    kg_per_strain: float
-    per_event: list[CalibrationEventResult]
-    report_url: str
 
 
 class CalibrationStatus(BaseModel):
@@ -282,22 +276,9 @@ class ReprocessingJob(BaseModel):
     failed_events: dict[str, list[FailedEvent]] = {}
 
 
-class ReprocessingJobSummary(BaseModel):
-    job_id: str
-    project: str
-    requested_by: str
-    requested_at: datetime
-    time_range_start: datetime
-    time_range_end: datetime
-    status: JobStatus
-    total_events: int
-    progress: dict[str, ServiceProgress] = {}
-    failed_events: dict[str, list[FailedEvent]] = {}
-
-
 # --- TypeAdapters for lists ---
 _DetectorSettingsListAdapter = TypeAdapter(list[DetectorSettings])
-_ReprocessingJobSummaryListAdapter = TypeAdapter(list[ReprocessingJobSummary])
+_ReprocessingJobListAdapter = TypeAdapter(list[ReprocessingJob])
 _EventListAdapter = TypeAdapter(list[Event])
 _EventStatusListAdapter = TypeAdapter(list[EventStatus])
 
@@ -318,6 +299,18 @@ class EventStatistics(BaseModel):
     n_events_all_time: int
     n_events_in_range: Optional[int] = None
     latest_event: Optional[LatestEvent] = None
+
+
+class TagValueCount(BaseModel):
+    tag_name: str
+    tag_value: str
+    count: int
+
+
+class TagValueCounts(BaseModel):
+    project: str
+    total_events: int
+    counts: list[TagValueCount]
 
 
 class MercutoEventService:
@@ -364,11 +357,14 @@ class MercutoEventService:
         r = self._client.request(f"{self._path}/details", "POST", json=body)
         return Event.model_validate_json(r.text)
 
-    def get_nearest_event(self, project: str, to: datetime) -> Event:
+    def get_nearest_event(self, project: str, to: datetime,
+                          maximum_delta: Optional[float] = None) -> Event:
         params: PayloadType = {
             'project': project,
             'to': to.isoformat(),
         }
+        if maximum_delta is not None:
+            params['maximum_delta'] = maximum_delta
         r = self._client.request(
             f"{self._path}/search/nearest", "GET", params=params)
         return Event.model_validate_json(r.text)
@@ -428,9 +424,9 @@ class MercutoEventService:
             f"{self._path}/detectors", "GET", params=params)
         return _DetectorSettingsListAdapter.validate_json(r.text)
 
-    def get_detector_settings(self, detector_id: int) -> DetectorSettings:
+    def get_detector_settings(self, detector_code: str) -> DetectorSettings:
         r = self._client.request(
-            f"{self._path}/detectors/{detector_id}", "GET")
+            f"{self._path}/detectors/{detector_code}", "GET")
         return DetectorSettings.model_validate_json(r.text)
 
     def create_detector(self, project: str,
@@ -449,7 +445,7 @@ class MercutoEventService:
         r = self._client.request(f"{self._path}/detectors", "POST", json=body)
         return DetectorSettings.model_validate_json(r.text)
 
-    def update_detector(self, detector_id: int,
+    def update_detector(self, detector_code: str,
                         datatables: list[str],
                         enabled: bool = True,
                         config: CronDetectorConfig | GenericDetectorConfig | None = None,
@@ -462,11 +458,11 @@ class MercutoEventService:
             'config': config.model_dump(mode='json'),
         }
         r = self._client.request(
-            f"{self._path}/detectors/{detector_id}", "PUT", json=body)
+            f"{self._path}/detectors/{detector_code}", "PUT", json=body)
         return DetectorSettings.model_validate_json(r.text)
 
-    def delete_detector(self, detector_id: int) -> None:
-        self._client.request(f"{self._path}/detectors/{detector_id}", "DELETE")
+    def delete_detector(self, detector_code: str) -> None:
+        self._client.request(f"{self._path}/detectors/{detector_code}", "DELETE")
 
     # ── Processing ───────────────────────────────────────
 
@@ -510,11 +506,11 @@ class MercutoEventService:
             f"{self._path}/reprocessing/jobs", "POST", json=body)
         return ReprocessingJob.model_validate_json(r.text)
 
-    def list_reprocessing_jobs(self, project: str) -> list[ReprocessingJobSummary]:
+    def list_reprocessing_jobs(self, project: str) -> list[ReprocessingJob]:
         params: PayloadType = {'project': project}
         r = self._client.request(
             f"{self._path}/reprocessing/jobs", "GET", params=params)
-        return _ReprocessingJobSummaryListAdapter.validate_json(r.text)
+        return _ReprocessingJobListAdapter.validate_json(r.text)
 
     def get_reprocessing_job(self, job_id: str) -> ReprocessingJob:
         r = self._client.request(
@@ -539,3 +535,19 @@ class MercutoEventService:
         r = self._client.request(
             f"{self._path}/statistics", "GET", params=params)
         return EventStatistics.model_validate_json(r.text)
+
+    def get_tag_value_counts(self, project: str,
+                             start_time: Optional[datetime] = None,
+                             end_time: Optional[datetime] = None,
+                             tag_name: Optional[str] = None,
+                             limit: int = 200) -> TagValueCounts:
+        params: PayloadType = {'project': project, 'limit': limit}
+        if start_time is not None:
+            params['start_time'] = start_time.isoformat()
+        if end_time is not None:
+            params['end_time'] = end_time.isoformat()
+        if tag_name is not None:
+            params['tag_name'] = tag_name
+        r = self._client.request(
+            f"{self._path}/statistics/tag_counts", "GET", params=params)
+        return TagValueCounts.model_validate_json(r.text)

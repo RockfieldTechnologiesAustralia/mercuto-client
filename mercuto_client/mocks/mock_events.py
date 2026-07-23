@@ -55,12 +55,16 @@ class MockMercutoEventService:
         self._events[code] = event
         return event
 
-    def get_nearest_event(self, project: str, to: datetime) -> Event:
+    def get_nearest_event(self, project: str, to: datetime,
+                          maximum_delta: Optional[float] = None) -> Event:
         candidates = [e for e in self._events.values() if e.project == project]
         if not candidates:
             raise MercutoHTTPException("No events found", 404)
-        return min(candidates, key=lambda e: min(abs((e.start_time - to).total_seconds()),
-                                                 abs((e.end_time - to).total_seconds())))
+        nearest = min(candidates, key=lambda e: abs((e.start_time - to).total_seconds()))
+        nearest_dist = abs((nearest.start_time - to).total_seconds())
+        if maximum_delta is not None and nearest_dist > maximum_delta:
+            raise MercutoHTTPException("No events found within the specified time range", 404)
+        return nearest
 
     def get_event(self, event: str) -> Event:
         if event not in self._events:
