@@ -95,6 +95,7 @@ class DashboardRow(BaseModel):
 
 
 class DashboardDefinition(BaseModel):
+    id: Optional[str] = None
     name: Optional[str] = None
     icon: Optional[str] = None
     banner_image: Optional[str] = None
