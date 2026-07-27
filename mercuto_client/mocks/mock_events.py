@@ -51,6 +51,7 @@ class MockMercutoEventService:
             tags=tags or [],
             vehicles=[],
             artifacts=[],
+            processing_statuses=[]
         )
         self._events[code] = event
         return event

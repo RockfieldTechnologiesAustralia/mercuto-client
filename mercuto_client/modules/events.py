@@ -75,6 +75,13 @@ class EditVehicleIn(BaseModel):
     axles: list[EditAxleIn]
 
 
+class EventStatus(BaseModel):
+    service: str
+    status: Literal['pending', 'completed', 'failed']
+    message: str | None = None
+    updated_at: datetime
+
+
 class Event(BaseModel):
     project: str
     code: str
@@ -84,13 +91,7 @@ class Event(BaseModel):
     tags: list[Tag]
     vehicles: list[Vehicle]
     artifacts: list[Artifact]
-
-
-class EventStatus(BaseModel):
-    service: str
-    status: Literal['pending', 'completed', 'failed']
-    message: str | None = None
-    updated_at: datetime
+    processing_statuses: list[EventStatus]
 
 
 # ── Detectors ────────────────────────────────────────────
@@ -410,11 +411,6 @@ class MercutoEventService:
         r = self._client.request(
             f"{self._path}/details/{event}/next", "GET", params=params)
         return Event.model_validate_json(r.text)
-
-    def get_event_status(self, event: str) -> list[EventStatus]:
-        r = self._client.request(
-            f"{self._path}/details/{event}/status", "GET")
-        return _EventStatusListAdapter.validate_json(r.text)
 
     # ── Detectors ────────────────────────────────────────
 
