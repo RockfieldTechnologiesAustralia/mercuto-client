@@ -61,10 +61,12 @@ class MockMercutoEventService:
         candidates = [e for e in self._events.values() if e.project == project]
         if not candidates:
             raise MercutoHTTPException("No events found", 404)
-        nearest = min(candidates, key=lambda e: abs((e.start_time - to).total_seconds()))
+        nearest = min(candidates, key=lambda e: abs(
+            (e.start_time - to).total_seconds()))
         nearest_dist = abs((nearest.start_time - to).total_seconds())
         if maximum_delta is not None and nearest_dist > maximum_delta:
-            raise MercutoHTTPException("No events found within the specified time range", 404)
+            raise MercutoHTTPException(
+                "No events found within the specified time range", 404)
         return nearest
 
     def get_event(self, event: str) -> Event:
@@ -116,13 +118,15 @@ class MockMercutoEventService:
         if event not in self._events:
             raise MercutoHTTPException("Event not found", 404)
         event_model = self._events[event]
-        self._events[event] = event_model.model_copy(update={'tags': list(tags)})
+        self._events[event] = event_model.model_copy(
+            update={'tags': list(tags)})
 
     def get_next_event(self, event: str, direction: str, step: int = 1) -> Event:
         if event not in self._events:
             raise MercutoHTTPException("Event not found", 404)
         event_model = self._events[event]
-        candidates = [e for e in self._events.values() if e.project == event_model.project]
+        candidates = [e for e in self._events.values() if e.project ==
+                      event_model.project]
         if direction == "forward":
             candidates = sorted(
                 [e for e in candidates if e.start_time > event_model.start_time],
