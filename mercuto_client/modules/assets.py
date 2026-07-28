@@ -327,7 +327,6 @@ class MercutoAssetService:
     def put_display_styles(self, code: str, value: StylesConfig) -> Display:
         payload: PayloadType = {
             'section': 'styles',
-            # type: ignore[assignment]
             'value': value.model_dump(mode='json'),
         }
         r = self._client.request(

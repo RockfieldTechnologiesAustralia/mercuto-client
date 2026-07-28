@@ -378,8 +378,8 @@ class MercutoEventService:
         body: PayloadType = {
             'start_time': start_time.isoformat(),
             'end_time': end_time.isoformat(),
-            'tags': [t.model_dump(mode='json') for t in tags], # type: ignore[dict-item]
-            'vehicles': [v.model_dump(mode='json') for v in vehicles], # type: ignore[dict-item]
+            'tags': [t.model_dump(mode='json') for t in tags],  # type: ignore[dict-item]
+            'vehicles': [v.model_dump(mode='json') for v in vehicles],  # type: ignore[dict-item]
         }
         r = self._client.request(
             f"{self._path}/details/{event}", "PUT", json=body)
@@ -390,7 +390,7 @@ class MercutoEventService:
 
     def replace_event_tags(self, event: str, tags: list[Tag]) -> None:
         body: PayloadType = {
-            'tags': [t.model_dump(mode='json') for t in tags], # type: ignore[dict-item]
+            'tags': [t.model_dump(mode='json') for t in tags],  # type: ignore[dict-item]
         }
         self._client.request(
             f"{self._path}/details/{event}/tags", "PUT", json=body)
@@ -478,7 +478,7 @@ class MercutoEventService:
 
     def calibrate(self, config_id: int,
                   vehicles: list[CalibrationVehicle]) -> CalibrationStatus:
-        body: PayloadType = {'vehicles': [v.model_dump(mode='json') for v in vehicles]} # type: ignore[dict-item]
+        body: PayloadType = {'vehicles': [v.model_dump(mode='json') for v in vehicles]}  # type: ignore[dict-item]
         r = self._client.request(f"{self._path}/processing/{config_id}/calibrate", "POST", json=body)
         return CalibrationStatus.model_validate_json(r.text)
 
