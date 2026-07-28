@@ -75,11 +75,7 @@ class EditVehicleIn(BaseModel):
     axles: list[EditAxleIn]
 
 
-class EventStatus(BaseModel):
-    service: str
-    status: Literal['pending', 'completed', 'failed']
-    message: str | None = None
-    updated_at: datetime
+EventProcessingStatus = Literal['processing', 'complete', 'skipped', 'failed']
 
 
 class Event(BaseModel):
@@ -91,7 +87,8 @@ class Event(BaseModel):
     tags: list[Tag]
     vehicles: list[Vehicle]
     artifacts: list[Artifact]
-    processing_statuses: list[EventStatus]
+    processing_status: EventProcessingStatus
+    processing_status_message: Optional[str] = None
 
 
 # ── Detectors ────────────────────────────────────────────
@@ -273,15 +270,14 @@ class ReprocessingJob(BaseModel):
     time_range_end: datetime
     status: JobStatus
     total_events: int
-    progress: dict[str, ServiceProgress] = {}
-    failed_events: dict[str, list[FailedEvent]] = {}
+    progress: ServiceProgress = ServiceProgress()
+    failed_events: list[FailedEvent] = []
 
 
 # --- TypeAdapters for lists ---
 _DetectorSettingsListAdapter = TypeAdapter(list[DetectorSettings])
 _ReprocessingJobListAdapter = TypeAdapter(list[ReprocessingJob])
 _EventListAdapter = TypeAdapter(list[Event])
-_EventStatusListAdapter = TypeAdapter(list[EventStatus])
 
 
 # ── Statistics ───────────────────────────────────────────
