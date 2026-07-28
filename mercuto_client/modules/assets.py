@@ -231,12 +231,18 @@ class DeviceGroupAnnotation(BaseModel):
         return v
 
 
+class RegionVertex(BaseModel):
+    """A single polygon vertex as a geographic coordinate."""
+    longitude: float
+    latitude: float
+
+
 class DeviceGroup(BaseModel):
     code: str
     project: str
     label: str
     description: Optional[str] = None
-    region: Optional[list[tuple[float, float]]] = None
+    region: Optional[list[RegionVertex]] = None
     reference_document_code: Optional[str] = None
     annotations: Optional[list[DeviceGroupAnnotation]] = None
     devices: list[str]
@@ -561,7 +567,7 @@ class MercutoAssetService:
         project: str,
         label: str,
         description: Optional[str] = None,
-        region: Optional[list[tuple[float, float]]] = None,
+        region: Optional[list[RegionVertex]] = None,
         reference_document_code: Optional[str] = None,
         annotations: Optional[list[DeviceGroupAnnotation]] = None,
         devices: Optional[list[str]] = None,
@@ -573,7 +579,10 @@ class MercutoAssetService:
             'reference_document_code': reference_document_code,
             'devices': devices or [],
         }
-        payload['region'] = region  # type: ignore[assignment]
+        if region is not None:
+            payload['region'] = [v.model_dump(mode='json') for v in region]  # type: ignore[assignment]
+        else:
+            payload['region'] = None
         if annotations is not None:
             payload['annotations'] = [a.model_dump(mode='json') for a in annotations]  # type: ignore[assignment]
         r = self._client.request(f"{self._path}/device-groups", 'POST', json=payload)
@@ -588,7 +597,7 @@ class MercutoAssetService:
         code: str,
         label: str,
         description: Optional[str] = None,
-        region: Optional[list[tuple[float, float]]] = None,
+        region: Optional[list[RegionVertex]] = None,
         reference_document_code: Optional[str] = None,
         annotations: Optional[list[DeviceGroupAnnotation]] = None,
         devices: Optional[list[str]] = None,
@@ -599,7 +608,10 @@ class MercutoAssetService:
             'reference_document_code': reference_document_code,
             'devices': devices or [],
         }
-        payload['region'] = region  # type: ignore[assignment]
+        if region is not None:
+            payload['region'] = [v.model_dump(mode='json') for v in region]  # type: ignore[assignment]
+        else:
+            payload['region'] = None
         if annotations is not None:
             payload['annotations'] = [a.model_dump(mode='json') for a in annotations]  # type: ignore[assignment]
         r = self._client.request(f"{self._path}/device-groups/{code}", 'PUT', json=payload)
