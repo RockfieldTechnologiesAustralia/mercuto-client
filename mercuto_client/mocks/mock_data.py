@@ -159,8 +159,7 @@ class MockMercutoDataService(MercutoDataService, metaclass=EnforceOverridesMeta)
 
         def load_from_buffer(buffer: pd.DataFrame) -> pd.DataFrame:
             # Filter by channels if provided
-            if channels is not None:
-                buffer = buffer[buffer.index.get_level_values('channel').isin(channels)]
+            buffer = buffer[buffer.index.get_level_values('channel').isin(channels)]
 
             # Filter by time range
             buffer = buffer[
@@ -171,7 +170,11 @@ class MockMercutoDataService(MercutoDataService, metaclass=EnforceOverridesMeta)
 
         secondary_part = load_from_buffer(self._secondary_and_primary_buffer)
         metric_part = load_from_buffer(self._metric_buffer)[['value']]
-        ts = pd.concat([secondary_part, metric_part], axis=0).sort_index()
+        parts = [part for part in (secondary_part, metric_part) if not part.empty]
+        if parts:
+            ts = pd.concat(parts, axis=0).sort_index()
+        else:
+            ts = secondary_part.sort_index()
 
         assert ts.columns == ['value']
         assert ts.index.names == ['channel', 'timestamp']
@@ -435,7 +438,10 @@ class MockMercutoDataService(MercutoDataService, metaclass=EnforceOverridesMeta)
                            value_name='value').sort_index()
         frame.index.name = 'timestamp'
         frame = frame.reset_index().set_index(['channel', 'timestamp'])
-        self._secondary_and_primary_buffer = pd.concat([self._secondary_and_primary_buffer, frame]).sort_index()
+        if len(self._secondary_and_primary_buffer) == 0:
+            self._secondary_and_primary_buffer = frame.sort_index()
+        else:
+            self._secondary_and_primary_buffer = pd.concat([self._secondary_and_primary_buffer, frame]).sort_index()
         self._update_last_valid_samples()
 
     def get_latest_samples(self, project: str, include_primary: bool = True) -> list[LatestDataSample]:

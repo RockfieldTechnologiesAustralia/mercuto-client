@@ -177,7 +177,7 @@ class MercutoMediaService:
 
     def list_videos(self, project: str,
                     camera: Optional[str] = None,
-                    event: Optional[str] = None,
+                    event: Optional[str | list[str]] = None,
                     start_time: Optional[datetime] = None,
                     end_time: Optional[datetime] = None,
                     limit: int = 10,

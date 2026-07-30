@@ -8,14 +8,18 @@ from typing import (Any, Iterator, Literal, Mapping, Optional, Protocol, Type,
 
 import requests
 import requests.cookies
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 from ._authentication import (IAuthenticationMethod,
                               create_authentication_method)
 from .exceptions import MercutoClientException, MercutoHTTPException
+from .modules.actions import MercutoActionService
 from .modules.alerts import MercutoAlertService
+from .modules.assets import MercutoAssetService
 from .modules.connect import MercutoConnectService
-from .modules.core import MercutoCoreService
 from .modules.data import MercutoDataService
+from .modules.events import MercutoEventService
 from .modules.fatigue import MercutoFatigueService
 from .modules.identity import MercutoIdentityService
 from .modules.media import MercutoMediaService
@@ -31,6 +35,26 @@ class _ModuleBase(Protocol):
 
 
 _T = TypeVar('_T', bound=_ModuleBase)
+
+
+def _configure_retries(session: requests.Session) -> None:
+    """
+    Mount HTTP adapters on the session that automatically retry failed
+    requests using an exponential backoff strategy.
+    """
+    retry = Retry(
+        total=3,
+        connect=3,
+        read=3,
+        status=3,
+        backoff_factor=0.5,
+        status_forcelist=(429, 500, 502, 503, 504),
+        allowed_methods=None,
+        raise_on_status=False,
+    )
+    adapter = HTTPAdapter(max_retries=retry)
+    session.mount('http://', adapter)
+    session.mount('https://', adapter)
 
 
 class MercutoClient:
@@ -50,6 +74,7 @@ class MercutoClient:
 
         if active_session is None:
             self._current_session = requests.Session()
+            _configure_retries(self._current_session)
         else:
             self._current_session = active_session
 
@@ -190,9 +215,6 @@ class MercutoClient:
     def data(self) -> 'MercutoDataService':
         return self._add_and_fetch_module('data', MercutoDataService)
 
-    def core(self) -> 'MercutoCoreService':
-        return self._add_and_fetch_module('core', MercutoCoreService)
-
     def media(self) -> 'MercutoMediaService':
         return self._add_and_fetch_module('media', MercutoMediaService)
 
@@ -204,6 +226,15 @@ class MercutoClient:
 
     def alerts(self) -> 'MercutoAlertService':
         return self._add_and_fetch_module('alerts', MercutoAlertService)
+
+    def assets(self) -> 'MercutoAssetService':
+        return self._add_and_fetch_module('assets', MercutoAssetService)
+
+    def events(self) -> 'MercutoEventService':
+        return self._add_and_fetch_module('events', MercutoEventService)
+
+    def actions(self) -> 'MercutoActionService':
+        return self._add_and_fetch_module('actions', MercutoActionService)
 
     def connectivity(self) -> 'MercutoConnectService':
         return self._add_and_fetch_module('connect', MercutoConnectService)

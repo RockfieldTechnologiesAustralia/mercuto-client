@@ -131,7 +131,7 @@ class MockMercutoMediaService(MercutoMediaService, metaclass=EnforceOverridesMet
 
     def list_videos(self, project: str,
                     camera: Optional[str] = None,
-                    event: Optional[str] = None,
+                    event: Optional[str | list[str]] = None,
                     start_time: Optional[datetime] = None,
                     end_time: Optional[datetime] = None,
                     limit: int = 10,
@@ -141,7 +141,9 @@ class MockMercutoMediaService(MercutoMediaService, metaclass=EnforceOverridesMet
         if camera:
             results = [vid for vid in results if vid.camera == camera]
         if event:
-            results = [vid for vid in results if vid.event == event]
+            if isinstance(event, str):
+                event = [event]
+            results = [vid for vid in results if vid.event in event]
         if start_time:
             results = [vid for vid in results if vid.start_time and vid.start_time >= start_time]
         if end_time:

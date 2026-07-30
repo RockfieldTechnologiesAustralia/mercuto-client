@@ -19,11 +19,10 @@ def mock_client() -> Iterator[MercutoClient]:
 
 def test_samples_upload(mock_client: MercutoClient) -> None:
     tenant = mock_client.identity().create_tenant('Test Tenant', 'T123456789')
-    project = mock_client.core().create_project(
-        'test_project',
-        'R123456789',
-        'Test Project',
-        tenant.code,
+    project = mock_client.assets().create_project(
+        tenant=tenant.code,
+        name='Test Project',
+        description='Test Project Description',
         timezone='UTC'
     )
 

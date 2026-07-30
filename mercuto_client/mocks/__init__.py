@@ -10,10 +10,11 @@ from ..client import MercutoClient
 def mock_mercuto(data: bool = True,
                  identity: bool = True,
                  fatigue: bool = True,
-                 core: bool = True,
                  media: bool = True,
                  notifications: bool = True,
                  connect: bool = True,
+                 events: bool = True,
+                 assets: bool = True,
                  verify_service_token: Optional[Callable[[str], VerifyMyPermissions]] = None) -> Iterator[None]:
     """
     While this context is active, all calls to MercutoClient will use mocked services.
@@ -31,36 +32,19 @@ def mock_mercuto(data: bool = True,
                 verify_service_token=verify_service_token))
         if fatigue:
             stack.enter_context(mock_fatigue_module())
-        if core:
-            stack.enter_context(mock_core_module())
+        if assets:
+            stack.enter_context(mock_assets_module())
         if media:
             stack.enter_context(mock_media_module())
         if notifications:
             stack.enter_context(mock_notifications_module())
         if connect:
             stack.enter_context(mock_connect_module())
+        if events:
+            stack.enter_context(mock_events_module())
+        if assets:
+            stack.enter_context(mock_assets_module())
         yield
-
-
-@contextlib.contextmanager
-def mock_core_module() -> Iterator[None]:
-    from .mock_core import MockMercutoCoreService
-    original = MercutoClient.core
-
-    _cache: Optional[MockMercutoCoreService] = None
-
-    def stub(self: MercutoClient) -> MockMercutoCoreService:
-        nonlocal _cache
-        if _cache is None:
-            _cache = MockMercutoCoreService(self)
-        _cache._client = self
-        return _cache
-
-    try:
-        setattr(MercutoClient, 'core', stub)
-        yield
-    finally:
-        setattr(MercutoClient, 'core', original)
 
 
 @contextlib.contextmanager
@@ -188,3 +172,45 @@ def mock_connect_module() -> Iterator[None]:
         yield
     finally:
         setattr(MercutoClient, 'connectivity', original)
+
+
+@contextlib.contextmanager
+def mock_events_module() -> Iterator[None]:
+    from .mock_events import MockMercutoEventService
+    original = MercutoClient.events
+
+    _cache: Optional[MockMercutoEventService] = None
+
+    def stub(self: MercutoClient) -> MockMercutoEventService:
+        nonlocal _cache
+        if _cache is None:
+            _cache = MockMercutoEventService(self)
+        _cache._client = self
+        return _cache
+
+    try:
+        setattr(MercutoClient, 'events', stub)
+        yield
+    finally:
+        setattr(MercutoClient, 'events', original)
+
+
+@contextlib.contextmanager
+def mock_assets_module() -> Iterator[None]:
+    from .mock_assets import MockMercutoAssetService
+    original = MercutoClient.assets
+
+    _cache: Optional[MockMercutoAssetService] = None
+
+    def stub(self: MercutoClient) -> MockMercutoAssetService:
+        nonlocal _cache
+        if _cache is None:
+            _cache = MockMercutoAssetService(self)
+        _cache._client = self
+        return _cache
+
+    try:
+        setattr(MercutoClient, 'assets', stub)
+        yield
+    finally:
+        setattr(MercutoClient, 'assets', original)
