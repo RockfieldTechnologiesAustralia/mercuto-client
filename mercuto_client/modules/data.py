@@ -86,6 +86,26 @@ class LatestDataSample(BaseModel):
     value: float
 
 
+class MqttConnectorType(enum.Enum):
+    WORLDSENSING = 'worldsensing'
+
+
+class MqttConnector(BaseModel):
+    code: str
+    project: str
+    name: str
+    connector_type: MqttConnectorType
+    broker_url: str
+    broker_port: int
+    use_tls: bool
+    username: str
+    topic: str
+    enabled: bool
+    last_connected_at: Optional[datetime]
+    last_message_at: Optional[datetime]
+    last_error: Optional[str]
+
+
 _ChannellistAdapter = TypeAdapter(list[Channel])
 _ExpressionlistAdapter = TypeAdapter(list[Expression])
 _DatatablelistAdapter = TypeAdapter(list[Datatable])
@@ -93,6 +113,7 @@ _UnitslistAdapter = TypeAdapter(list[Units])
 _MetricSamplelistAdapter = TypeAdapter(list[MetricDataSample])
 _SecondarySamplelistAdapter = TypeAdapter(list[SecondaryDataSample])
 _LatestSampleListAdapter = TypeAdapter(list[LatestDataSample])
+_MqttConnectorListAdapter = TypeAdapter(list[MqttConnector])
 
 
 class FrameFormat(enum.Enum):
@@ -653,3 +674,77 @@ class MercutoDataService:
         )
 
         return _LatestSampleListAdapter.validate_json(r.text)
+
+    """
+    MQTT Connectors
+    """
+
+    def list_mqtt_connectors(self, project: str) -> list[MqttConnector]:
+        r = self._client.request(
+            f'{self._path}/connectors/mqtt', 'GET', params={"project": project}
+        )
+        return _MqttConnectorListAdapter.validate_json(r.text)
+
+    def get_mqtt_connector(self, code: str) -> Optional[MqttConnector]:
+        r = self._client.request(
+            f'{self._path}/connectors/mqtt/{code}', 'GET', raise_for_status=False
+        )
+        if r.status_code == 404:
+            return None
+        raise_for_response(r)
+        return MqttConnector.model_validate_json(r.text)
+
+    def create_mqtt_connector(self, project: str, name: str, broker_url: str, username: str,
+                              password: str, topic: str,
+                              connector_type: MqttConnectorType = MqttConnectorType.WORLDSENSING,
+                              broker_port: int = 8883, use_tls: bool = True,
+                              enabled: bool = True) -> MqttConnector:
+        payload: PayloadType = {
+            "project": project,
+            "name": name,
+            "connector_type": connector_type.value,
+            "broker_url": broker_url,
+            "broker_port": broker_port,
+            "use_tls": use_tls,
+            "username": username,
+            "password": password,
+            "topic": topic,
+            "enabled": enabled,
+        }
+        r = self._client.request(
+            f'{self._path}/connectors/mqtt', 'PUT', json=payload
+        )
+        return MqttConnector.model_validate_json(r.text)
+
+    def update_mqtt_connector(self, code: str, name: Optional[str] = None,
+                              broker_url: Optional[str] = None, broker_port: Optional[int] = None,
+                              use_tls: Optional[bool] = None, username: Optional[str] = None,
+                              password: Optional[str] = None, topic: Optional[str] = None,
+                              enabled: Optional[bool] = None) -> MqttConnector:
+        payload: PayloadType = {}
+        if name is not None:
+            payload["name"] = name
+        if broker_url is not None:
+            payload["broker_url"] = broker_url
+        if broker_port is not None:
+            payload["broker_port"] = broker_port
+        if use_tls is not None:
+            payload["use_tls"] = use_tls
+        if username is not None:
+            payload["username"] = username
+        if password is not None:
+            payload["password"] = password
+        if topic is not None:
+            payload["topic"] = topic
+        if enabled is not None:
+            payload["enabled"] = enabled
+        r = self._client.request(
+            f'{self._path}/connectors/mqtt/{code}', 'PATCH', json=payload
+        )
+        return MqttConnector.model_validate_json(r.text)
+
+    def delete_mqtt_connector(self, code: str) -> bool:
+        r = self._client.request(
+            f'{self._path}/connectors/mqtt/{code}', 'DELETE'
+        )
+        return r.status_code == 204
