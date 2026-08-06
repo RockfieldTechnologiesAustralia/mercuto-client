@@ -200,8 +200,10 @@ class CalibrationEventResult(BaseModel):
     velocity_error_kmh: float
     axle_spacings: list[AxleSpacingComparison]
     axle_results: list[AxleCalibrationResult]
-    raw_strain_measurement: float
-    derived_kg_per_strain: float
+    # None when the event could not be weighed; failure_reason then explains why.
+    raw_strain_measurement: Optional[float] = None
+    derived_kg_per_strain: Optional[float] = None
+    failure_reason: Optional[str] = None
 
 
 class CalibrationMetadata(BaseModel):
@@ -213,6 +215,8 @@ class CalibrationMetadata(BaseModel):
     computed_calibration_events: list[CalibrationEventResult] = []
     optimal_kg_per_strain: Optional[float] = None
     report_url: Optional[str] = None
+    # True when the processing config changed in a way that affects calibration since it was computed.
+    is_outdated: bool = False
 
 
 class ProcessingConfigBodyIn(BaseModel):
@@ -229,7 +233,6 @@ class ProcessingConfigBody(BaseModel):
     dynamic_amplification: Optional[DynamicAmplificationConfig] = None
     vehicle_bwim: Optional[VehicleBWimConfig] = None
     load_distribution: Optional[LoadDistributionConfig] = None
-    calibration: Optional[CalibrationMetadata] = None
 
 
 class ProcessingConfig(BaseModel):
@@ -237,6 +240,9 @@ class ProcessingConfig(BaseModel):
     project: str
     enabled: bool
     config: ProcessingConfigBody
+    # Calibration is a derived result stored alongside (not inside) the config.
+    calibration: Optional[CalibrationMetadata] = None
+    updated_at: Optional[datetime] = None
 
 
 class CalibrationStatus(BaseModel):
