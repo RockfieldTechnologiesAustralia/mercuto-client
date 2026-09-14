@@ -35,9 +35,10 @@ class Project(BaseModel):
 
 
 class DeviceChannel(BaseModel):
+    field_key: str
     field: str
     channel: str
-    source_slot: Optional[str] = None
+    routed_via: Optional[str] = None
 
 
 class MetadataEntry(BaseModel):
@@ -169,9 +170,13 @@ class DeviceTypeMetadataFieldDefinition(BaseModel):
     unit: Optional[str] = None
 
 
-class DeviceTypeChannelDefinition(BaseModel):
+class DeviceTypeChannel(BaseModel):
+    field_key: str
     field: str
     description: Optional[str] = None
+    unit: Optional[str] = None
+    channel_label_template: Optional[str] = None
+    required: bool = True
 
 
 class DeviceTypeChildSpecRequiredMetadataField(BaseModel):
@@ -180,7 +185,7 @@ class DeviceTypeChildSpecRequiredMetadataField(BaseModel):
     multiple: bool = False
 
 
-class DeviceTypeReadingSlot(BaseModel):
+class DeviceTypeRoutedChannel(BaseModel):
     key: str
     description: Optional[str] = None
     channel_label_template: str
@@ -190,15 +195,14 @@ class DeviceTypeReadingSlot(BaseModel):
 class DeviceTypeChildSpec(BaseModel):
     allowed_device_types: list[str] = []
     required_metadata: list[DeviceTypeChildSpecRequiredMetadataField] = []
-    reading_slots: list[DeviceTypeReadingSlot] = []
+    routed_channels: list[DeviceTypeRoutedChannel] = []
     max_count: Optional[int] = None
 
 
 class DeviceTypeTemplate(BaseModel):
-    version: Literal[1] = 1
+    version: Literal[2] = 2
     metadata: list[DeviceTypeMetadataFieldDefinition] = []
-    channels: list[DeviceTypeChannelDefinition] = []
-    reading_slots: list[DeviceTypeReadingSlot] = []
+    channels: list[DeviceTypeChannel] = []
     children: list[DeviceTypeChildSpec] = []
 
 
