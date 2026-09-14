@@ -35,6 +35,7 @@ class Project(BaseModel):
 
 
 class DeviceChannel(BaseModel):
+    field_key: str
     field: str
     channel: str
     field_key: Optional[str] = None
@@ -181,6 +182,9 @@ class DeviceTypeChannel(BaseModel):
     important: bool
     unit: Optional[str] = None
     description: Optional[str] = None
+    unit: Optional[str] = None
+    channel_label_template: Optional[str] = None
+    required: bool = True
 
 
 class DeviceType(BaseModel):
