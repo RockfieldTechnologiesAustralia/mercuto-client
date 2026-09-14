@@ -39,6 +39,7 @@ class DeviceChannel(BaseModel):
     field: str
     channel: str
     routed_via: Optional[str] = None
+    important: bool = True
 
 
 class MetadataEntry(BaseModel):
@@ -177,6 +178,7 @@ class DeviceTypeChannel(BaseModel):
     unit: Optional[str] = None
     channel_label_template: Optional[str] = None
     required: bool = True
+    important: bool = True
 
 
 class DeviceTypeChildSpecRequiredMetadataField(BaseModel):
