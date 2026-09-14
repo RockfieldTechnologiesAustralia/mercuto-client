@@ -185,6 +185,7 @@ class DeviceTypeChannel(BaseModel):
     unit: Optional[str] = None
     channel_label_template: Optional[str] = None
     required: bool = True
+    important: bool = True
 
 
 class DeviceType(BaseModel):
