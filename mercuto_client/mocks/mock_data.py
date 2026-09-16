@@ -9,12 +9,23 @@ import pandas as pd
 
 from ..client import MercutoClient
 from ..exceptions import MercutoHTTPException
-from ..modules.data import (AggregationMethod, AggregationOptions, Channel,
-                            ChannelClassification, ChannelFormat, Datatable,
-                            DatatableColumn, FileFormat, FrameFormat,
-                            GetStatusRequestResponse, LatestDataSample,
-                            MercutoDataService, MetricDataSample,
-                            SecondaryDataSample, Units)
+from ..modules.data import (
+    AggregationMethod,
+    AggregationOptions,
+    Channel,
+    ChannelClassification,
+    ChannelFormat,
+    Datatable,
+    DatatableColumn,
+    FileFormat,
+    FrameFormat,
+    GetStatusRequestResponse,
+    LatestDataSample,
+    MercutoDataService,
+    MetricDataSample,
+    SecondaryDataSample,
+    Units,
+)
 from ._utility import EnforceOverridesMeta
 
 logger = logging.getLogger(__name__)

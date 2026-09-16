@@ -54,8 +54,15 @@ build-backend = "setuptools.build_meta"
 [tool.setuptools.package-data]
 mercuto_client = ["py.typed"]
 
+[tool.isort]
+profile = "black"
+line_length = 150
+
 [tool.mypy]
 strict = false
+ignore_missing_imports = true
+explicit_package_bases = true
+exclude = ["build/"]
 
 [project.scripts]
 mc-ftp-ingester = "mercuto_client.ingester.__main__:main"

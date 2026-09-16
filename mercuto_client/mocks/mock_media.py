@@ -7,8 +7,7 @@ from typing import Optional
 
 from ..client import MercutoClient
 from ..exceptions import MercutoHTTPException
-from ..modules.media import (Camera, CameraTrigger, CameraType, Image,
-                             MercutoMediaService, Video)
+from ..modules.media import Camera, CameraTrigger, CameraType, Image, MercutoMediaService, Video
 from ._utility import EnforceOverridesMeta, create_data_url
 
 logger = logging.getLogger(__name__)

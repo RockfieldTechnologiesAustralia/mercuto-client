@@ -7,9 +7,7 @@ from pydantic import BaseModel
 
 from ..client import MercutoClient
 from ..exceptions import MercutoHTTPException
-from ..modules.notifications import (ContactGroup, ContactMethod,
-                                     MercutoNotificationService,
-                                     NotificationAttachment)
+from ..modules.notifications import ContactGroup, ContactMethod, MercutoNotificationService, NotificationAttachment
 from ._utility import EnforceOverridesMeta
 
 logger = logging.getLogger(__name__)

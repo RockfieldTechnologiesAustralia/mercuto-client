@@ -5,10 +5,17 @@ from typing import Callable, Optional
 
 from ..client import MercutoClient
 from ..exceptions import MercutoHTTPException
-from ..modules.identity import (CurrentUser, HiddenUserAPIKey,
-                                MercutoIdentityService, PermissionGroup,
-                                Tenant, User, UserDetails, VerifyMyPermissions,
-                                VisibleUserAPIKey)
+from ..modules.identity import (
+    CurrentUser,
+    HiddenUserAPIKey,
+    MercutoIdentityService,
+    PermissionGroup,
+    Tenant,
+    User,
+    UserDetails,
+    VerifyMyPermissions,
+    VisibleUserAPIKey,
+)
 from ._utility import EnforceOverridesMeta
 
 logger = logging.getLogger(__name__)

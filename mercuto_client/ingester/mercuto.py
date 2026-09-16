@@ -8,8 +8,7 @@ import pytz
 
 from .. import MercutoClient, MercutoHTTPException
 from ..modules.assets import Project
-from ..modules.data import (Channel, ChannelClassification, Datatable,
-                            SecondaryDataSample)
+from ..modules.data import Channel, ChannelClassification, Datatable, SecondaryDataSample
 from ..modules.media import Camera
 from ..util import batched, get_my_public_ip
 from .parsers import detect_parser

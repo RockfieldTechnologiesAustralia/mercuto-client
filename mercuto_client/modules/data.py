@@ -3,8 +3,7 @@ import os
 import time
 from contextlib import nullcontext
 from datetime import datetime, timedelta
-from typing import (TYPE_CHECKING, Any, BinaryIO, Collection, Literal,
-                    Optional, TextIO, Union)
+from typing import TYPE_CHECKING, Any, BinaryIO, Collection, Literal, Optional, TextIO, Union
 
 from pydantic import TypeAdapter
 

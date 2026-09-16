@@ -4,8 +4,7 @@ import pytz
 
 from ...modules.data import SecondaryDataSample
 from .campbell import parse_campbell_file
-from .worldsensing import (parse_worldsensing_compact_file,
-                           parse_worldsensing_standard_file)
+from .worldsensing import parse_worldsensing_compact_file, parse_worldsensing_standard_file
 
 
 class Parser(Protocol):

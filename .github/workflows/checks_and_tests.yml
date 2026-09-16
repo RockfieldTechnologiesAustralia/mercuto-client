@@ -28,10 +28,10 @@ jobs:
           uv run isort ./mercuto_client/ --check --diff
       - name: Validate Flake8
         run: |
-          uv run flake8 ./mercuto_client/ --count --max-line-length=150 --show-source --statistics --exclude mercuto-client/build
+          uv run flake8 ./mercuto_client/ --count --show-source --statistics
       - name: Validate MyPy
         run: |
-          uv run mypy ./mercuto_client/ --ignore-missing-imports --explicit-package-bases --exclude build/* 
+          uv run mypy ./mercuto_client/
   unit-tests-all-architectures:
     timeout-minutes: 5
     runs-on: ${{ matrix.os }}

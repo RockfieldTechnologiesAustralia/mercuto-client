@@ -35,11 +35,13 @@ class Project(BaseModel):
 
 
 class DeviceChannel(BaseModel):
-    field_key: str
     field: str
     channel: str
+    field_key: Optional[str] = None
     routed_via: Optional[str] = None
     important: bool = True
+    #: Server-resolved MQTT channel label for self-reporting/routed bindings (read-only; ignored on write).
+    expected_channel_label: Optional[str] = None
 
 
 class MetadataEntry(BaseModel):
@@ -161,51 +163,30 @@ class Display(BaseModel):
 
 
 # ── Device types ────────────────────────────────────────────────────────────
+#
+# Device types are hardcoded in ``mercuto_core.device_types`` on the server and are no
+# longer user-editable. These models are the flat, read-only projection served by the
+# asset-service; behaviour (label resolution, child validation) never crosses the wire.
 
 
-class DeviceTypeMetadataFieldDefinition(BaseModel):
-    metadata_key: str
-    description: Optional[str] = None
+class DeviceTypeMetadataField(BaseModel):
+    key: str
+    label: Optional[str] = None
     data_type: Literal['string', 'number', 'boolean', 'document']
-    multiple: bool = False
+    required: bool
+    multiple: bool
     unit: Optional[str] = None
+    description: Optional[str] = None
 
 
 class DeviceTypeChannel(BaseModel):
     field_key: str
     field: str
-    description: Optional[str] = None
+    transport: str
+    required: bool
+    important: bool
     unit: Optional[str] = None
-    channel_label_template: Optional[str] = None
-    required: bool = True
-    important: bool = True
-
-
-class DeviceTypeChildSpecRequiredMetadataField(BaseModel):
-    key: str
-    data_type: Literal['string', 'number', 'boolean', 'document'] = 'string'
-    multiple: bool = False
-
-
-class DeviceTypeRoutedChannel(BaseModel):
-    key: str
     description: Optional[str] = None
-    channel_label_template: str
-    required: bool = True
-
-
-class DeviceTypeChildSpec(BaseModel):
-    allowed_device_types: list[str] = []
-    required_metadata: list[DeviceTypeChildSpecRequiredMetadataField] = []
-    routed_channels: list[DeviceTypeRoutedChannel] = []
-    max_count: Optional[int] = None
-
-
-class DeviceTypeTemplate(BaseModel):
-    version: Literal[2] = 2
-    metadata: list[DeviceTypeMetadataFieldDefinition] = []
-    channels: list[DeviceTypeChannel] = []
-    children: list[DeviceTypeChildSpec] = []
 
 
 class DeviceType(BaseModel):
@@ -215,9 +196,9 @@ class DeviceType(BaseModel):
     model_number: Optional[str] = None
     description: Optional[str] = None
     icon: Optional[str] = None
-    template: DeviceTypeTemplate
-    created_at: datetime
-    updated_at: datetime
+    accepts_children: bool
+    metadata_fields: list[DeviceTypeMetadataField] = []
+    channels: list[DeviceTypeChannel] = []
 
 
 # ── Device groups ────────────────────────────────────────────────────────────
@@ -376,7 +357,8 @@ class MercutoAssetService:
             'limit': limit,
             'offset': offset,
         }
-        r = self._client.request(f"{self._path}/projects", 'GET', params=params)
+        r = self._client.request(
+            f"{self._path}/projects", 'GET', params=params)
         return _ProjectListAdapter.validate_json(r.text)
 
     def create_project(
@@ -474,7 +456,7 @@ class MercutoAssetService:
             'altitude': altitude,
         }
         payload['metadata'] = {k: v.model_dump(mode='json') for k, v in (metadata or {}).items()}  # type: ignore[assignment]
-        payload['channels'] = [c.model_dump(mode='json') for c in (channels or [])]  # type: ignore[assignment]
+        payload['channels'] = [c.model_dump(mode='json', exclude={'expected_channel_label'}) for c in (channels or [])]  # type: ignore[assignment]
         r = self._client.request(f"{self._path}/devices", 'POST', json=payload)
         return Device.model_validate_json(r.text)
 
@@ -501,7 +483,7 @@ class MercutoAssetService:
             'altitude': altitude,
         }
         payload['metadata'] = {k: v.model_dump(mode='json') for k, v in (metadata or {}).items()}  # type: ignore[assignment]
-        payload['channels'] = [c.model_dump(mode='json') for c in (channels or [])]  # type: ignore[assignment]
+        payload['channels'] = [c.model_dump(mode='json', exclude={'expected_channel_label'}) for c in (channels or [])]  # type: ignore[assignment]
         r = self._client.request(
             f"{self._path}/devices/{code}", 'PUT', json=payload)
         return Device.model_validate_json(r.text)
@@ -509,62 +491,25 @@ class MercutoAssetService:
     def delete_device(self, code: str) -> None:
         self._client.request(f"{self._path}/devices/{code}", 'DELETE')
 
-    # --- Device types routes ---
+    # --- Device types routes (read-only; catalogue is hardcoded server-side) ---
 
     def list_device_types(self, limit: int = 100, offset: int = 0) -> list[DeviceType]:
         params: PayloadType = {'limit': limit, 'offset': offset}
-        r = self._client.request(f"{self._path}/device-types", 'GET', params=params)
+        r = self._client.request(
+            f"{self._path}/device-types", 'GET', params=params)
         return _DeviceTypeListAdapter.validate_json(r.text)
-
-    def create_device_type(
-        self,
-        label: str,
-        manufacturer: Optional[str] = None,
-        model_number: Optional[str] = None,
-        description: Optional[str] = None,
-        template: Optional[DeviceTypeTemplate] = None,
-    ) -> DeviceType:
-        payload: PayloadType = {
-            'label': label,
-            'manufacturer': manufacturer,
-            'model_number': model_number,
-            'description': description,
-        }
-        payload['template'] = (template or DeviceTypeTemplate()).model_dump(mode='json')  # type: ignore[assignment]
-        r = self._client.request(f"{self._path}/device-types", 'POST', json=payload)
-        return DeviceType.model_validate_json(r.text)
 
     def get_device_type(self, code: str) -> DeviceType:
         r = self._client.request(f"{self._path}/device-types/{code}", 'GET')
         return DeviceType.model_validate_json(r.text)
 
-    def update_device_type(
-        self,
-        code: str,
-        label: str,
-        manufacturer: Optional[str] = None,
-        model_number: Optional[str] = None,
-        description: Optional[str] = None,
-        template: Optional[DeviceTypeTemplate] = None,
-    ) -> DeviceType:
-        payload: PayloadType = {
-            'label': label,
-            'manufacturer': manufacturer,
-            'model_number': model_number,
-            'description': description,
-        }
-        payload['template'] = (template or DeviceTypeTemplate()).model_dump(mode='json')  # type: ignore[assignment]
-        r = self._client.request(f"{self._path}/device-types/{code}", 'PUT', json=payload)
-        return DeviceType.model_validate_json(r.text)
-
-    def delete_device_type(self, code: str) -> None:
-        self._client.request(f"{self._path}/device-types/{code}", 'DELETE')
-
     # --- Device groups routes ---
 
     def list_device_groups(self, project: str, limit: int = 100, offset: int = 0) -> list[DeviceGroup]:
-        params: PayloadType = {'project': project, 'limit': limit, 'offset': offset}
-        r = self._client.request(f"{self._path}/device-groups", 'GET', params=params)
+        params: PayloadType = {'project': project,
+                               'limit': limit, 'offset': offset}
+        r = self._client.request(
+            f"{self._path}/device-groups", 'GET', params=params)
         return _DeviceGroupListAdapter.validate_json(r.text)
 
     def create_device_group(
@@ -589,8 +534,10 @@ class MercutoAssetService:
         else:
             payload['region'] = None
         if annotations is not None:
-            payload['annotations'] = [a.model_dump(mode='json') for a in annotations]  # type: ignore[assignment]
-        r = self._client.request(f"{self._path}/device-groups", 'POST', json=payload)
+            payload['annotations'] = [a.model_dump(  # type: ignore[assignment]
+                mode='json') for a in annotations]
+        r = self._client.request(
+            f"{self._path}/device-groups", 'POST', json=payload)
         return DeviceGroup.model_validate_json(r.text)
 
     def get_device_group(self, code: str) -> DeviceGroup:
@@ -618,8 +565,10 @@ class MercutoAssetService:
         else:
             payload['region'] = None
         if annotations is not None:
-            payload['annotations'] = [a.model_dump(mode='json') for a in annotations]  # type: ignore[assignment]
-        r = self._client.request(f"{self._path}/device-groups/{code}", 'PUT', json=payload)
+            payload['annotations'] = [a.model_dump(  # type: ignore[assignment]
+                mode='json') for a in annotations]
+        r = self._client.request(
+            f"{self._path}/device-groups/{code}", 'PUT', json=payload)
         return DeviceGroup.model_validate_json(r.text)
 
     def delete_device_group(self, code: str) -> None:
@@ -635,12 +584,14 @@ class MercutoAssetService:
         limit: int = 100,
         offset: int = 0,
     ) -> list[Document]:
-        params: PayloadType = {'project': project, 'limit': limit, 'offset': offset}
+        params: PayloadType = {'project': project,
+                               'limit': limit, 'offset': offset}
         if device is not None:
             params['device'] = device
         if tag:
             params['tag'] = tag  # type: ignore[assignment]
-        r = self._client.request(f"{self._path}/documents", 'GET', params=params)
+        r = self._client.request(
+            f"{self._path}/documents", 'GET', params=params)
         return _DocumentListAdapter.validate_json(r.text)
 
     def get_document(self, code: str) -> Document:
@@ -661,7 +612,8 @@ class MercutoAssetService:
             'description': description,
             'tags': tags or [],
         }
-        r = self._client.request(f"{self._path}/documents/{code}", 'PUT', json=payload)
+        r = self._client.request(
+            f"{self._path}/documents/{code}", 'PUT', json=payload)
         return Document.model_validate_json(r.text)
 
     def delete_document(self, code: str) -> None:
@@ -701,5 +653,6 @@ class MercutoAssetService:
             data=data,
         ).raise_for_status()
 
-        r = self._client.request(f"{self._path}/uploads/{session.code}/complete", 'POST')
+        r = self._client.request(
+            f"{self._path}/uploads/{session.code}/complete", 'POST')
         return Document.model_validate_json(r.text)
