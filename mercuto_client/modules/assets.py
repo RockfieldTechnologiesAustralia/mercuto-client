@@ -35,11 +35,12 @@ class Project(BaseModel):
 
 
 class DeviceChannel(BaseModel):
-    field_key: str
     field: str
     channel: str
     field_key: Optional[str] = None
     important: bool = True
+    #: Server-resolved MQTT channel label for self-reporting/routed bindings (read-only; ignored on write).
+    expected_channel_label: Optional[str] = None
 
 
 class MetadataEntry(BaseModel):
@@ -454,7 +455,7 @@ class MercutoAssetService:
             'altitude': altitude,
         }
         payload['metadata'] = {k: v.model_dump(mode='json') for k, v in (metadata or {}).items()}  # type: ignore[assignment]
-        payload['channels'] = [c.model_dump(mode='json') for c in (channels or [])]  # type: ignore[assignment]
+        payload['channels'] = [c.model_dump(mode='json', exclude={'expected_channel_label'}) for c in (channels or [])]  # type: ignore[assignment]
         r = self._client.request(f"{self._path}/devices", 'POST', json=payload)
         return Device.model_validate_json(r.text)
 
@@ -484,7 +485,7 @@ class MercutoAssetService:
         if device_type is not None:
             payload['device_type'] = device_type
         payload['metadata'] = {k: v.model_dump(mode='json') for k, v in (metadata or {}).items()}  # type: ignore[assignment]
-        payload['channels'] = [c.model_dump(mode='json') for c in (channels or [])]  # type: ignore[assignment]
+        payload['channels'] = [c.model_dump(mode='json', exclude={'expected_channel_label'}) for c in (channels or [])]  # type: ignore[assignment]
         r = self._client.request(
             f"{self._path}/devices/{code}", 'PUT', json=payload)
         return Device.model_validate_json(r.text)
