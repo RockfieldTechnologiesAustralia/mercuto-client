@@ -177,11 +177,6 @@ class MqttBindingStatus(enum.Enum):
     UNBOUND = 'unbound'
 
 
-class MqttBindingDestination(BaseModel):
-    code: str
-    label: str
-
-
 class MqttBufferedSample(BaseModel):
     timestamp: datetime
     value: float
@@ -197,7 +192,7 @@ class MqttBinding(BaseModel):
     info: dict[str, str | int | float | bool | None]
     configured_mode: MqttBindingMode
     bind_status: MqttBindingStatus
-    destination: Optional[MqttBindingDestination]
+    bound_channel: Optional[str]
     first_seen_at: datetime
     last_seen_at: datetime
     last_sample: MqttLastSample
