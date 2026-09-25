@@ -4,6 +4,7 @@ import time
 from contextlib import nullcontext
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Any, BinaryIO, Collection, Literal, Optional, TextIO, Union
+from urllib.parse import quote
 
 from pydantic import TypeAdapter
 
@@ -103,6 +104,53 @@ class MqttConnector(BaseModel):
     last_connected_at: Optional[datetime]
     last_message_at: Optional[datetime]
     last_error: Optional[str]
+
+
+class MqttBindingMode(enum.Enum):
+    AUTOMATIC = 'automatic'
+    MANUAL = 'manual'
+    SKIPPED = 'skipped'
+
+
+class MqttBindingType(enum.Enum):
+    AUTOMATIC = 'automatic'
+    MANUAL = 'manual'
+    SKIPPED = 'skipped'
+    UNBOUND = 'unbound'
+    CONFLICT = 'conflict'
+
+
+class MqttBindingDestination(BaseModel):
+    code: str
+    label: str
+
+
+class MqttBufferedSample(BaseModel):
+    timestamp: datetime
+    value: float
+
+
+class MqttLastSample(BaseModel):
+    timestamp: datetime
+    value: float
+
+
+class MqttBinding(BaseModel):
+    bind_key: str
+    info: dict[str, str | int | float | bool | None]
+    configured_mode: MqttBindingMode
+    binding_type: MqttBindingType
+    destination: Optional[MqttBindingDestination]
+    first_seen_at: datetime
+    last_seen_at: datetime
+    last_sample: MqttLastSample
+    uncommitted_count: int
+    uncommitted_samples: list[MqttBufferedSample]
+
+
+class MqttBindingPage(BaseModel):
+    items: list[MqttBinding]
+    total: int
 
 
 _ChannellistAdapter = TypeAdapter(list[Channel])
@@ -747,3 +795,35 @@ class MercutoDataService:
             f'{self._path}/connectors/mqtt/{code}', 'DELETE'
         )
         return r.status_code == 204
+
+    """
+    MQTT Bindings
+    """
+
+    def list_mqtt_bindings(self, project: str, search: Optional[str] = None,
+                           limit: int = 100, offset: int = 0) -> MqttBindingPage:
+        params: PayloadType = {
+            'project': project,
+            'limit': limit,
+            'offset': offset,
+        }
+        if search is not None:
+            params['search'] = search
+        r = self._client.request(
+            f'{self._path}/connectors/mqtt-bindings', 'GET', params=params
+        )
+        return MqttBindingPage.model_validate_json(r.text)
+
+    def update_mqtt_binding(self, project: str, bind_key: str, mode: MqttBindingMode,
+                            destination_channel: Optional[str] = None) -> MqttBinding:
+        payload: PayloadType = {
+            'project': project,
+            'mode': mode.value,
+        }
+        if destination_channel is not None:
+            payload['destination_channel'] = destination_channel
+        encoded_bind_key = quote(bind_key, safe='')
+        r = self._client.request(
+            f'{self._path}/connectors/mqtt-bindings/{encoded_bind_key}', 'PATCH', json=payload
+        )
+        return MqttBinding.model_validate_json(r.text)
