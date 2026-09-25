@@ -162,6 +162,53 @@ class MqttBindingPage(BaseModel):
     total: int
 
 
+class MqttBindingMode(enum.Enum):
+    AUTOMATIC = 'automatic'
+    MANUAL = 'manual'
+    SKIPPED = 'skipped'
+
+
+class MqttBindingType(enum.Enum):
+    AUTOMATIC = 'automatic'
+    MANUAL = 'manual'
+    SKIPPED = 'skipped'
+    UNBOUND = 'unbound'
+    CONFLICT = 'conflict'
+
+
+class MqttBindingDestination(BaseModel):
+    code: str
+    label: str
+
+
+class MqttBufferedSample(BaseModel):
+    timestamp: datetime
+    value: float
+
+
+class MqttLastSample(BaseModel):
+    timestamp: datetime
+    value: float
+
+
+class MqttBinding(BaseModel):
+    bind_key: str
+    info: dict[str, str | int | float | bool | None]
+    configured_mode: MqttBindingMode
+    binding_type: MqttBindingType
+    destination: Optional[MqttBindingDestination]
+    first_seen_at: datetime
+    last_seen_at: datetime
+    last_sample: MqttLastSample
+    uncommitted_count: int
+    uncommitted_samples: list[MqttBufferedSample]
+
+
+class MqttBindingPage(BaseModel):
+    items: list[MqttBinding]
+    total: int
+
+
 _ChannellistAdapter = TypeAdapter(list[Channel])
 _ExpressionlistAdapter = TypeAdapter(list[Expression])
 _DatatablelistAdapter = TypeAdapter(list[Datatable])
