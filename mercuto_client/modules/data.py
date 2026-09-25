@@ -112,12 +112,13 @@ class MqttBindingMode(enum.Enum):
     SKIPPED = 'skipped'
 
 
-class MqttBindingType(enum.Enum):
-    AUTOMATIC = 'automatic'
-    MANUAL = 'manual'
+class MqttBindingStatus(enum.Enum):
+    AUTOMATIC_BOUND = 'automatic_bound'
+    AUTOMATIC_CONFLICT = 'automatic_conflict'
+    MANUAL_BOUND = 'manual_bound'
+    MANUAL_UNBOUND = 'manual_unbound'
     SKIPPED = 'skipped'
     UNBOUND = 'unbound'
-    CONFLICT = 'conflict'
 
 
 class MqttBindingDestination(BaseModel):
@@ -139,7 +140,7 @@ class MqttBinding(BaseModel):
     bind_key: str
     info: dict[str, str | int | float | bool | None]
     configured_mode: MqttBindingMode
-    binding_type: MqttBindingType
+    bind_status: MqttBindingStatus
     destination: Optional[MqttBindingDestination]
     first_seen_at: datetime
     last_seen_at: datetime
