@@ -103,7 +103,20 @@ class MqttConnector(BaseModel):
     enabled: bool
     last_connected_at: Optional[datetime]
     last_message_at: Optional[datetime]
-    last_error: Optional[str]
+
+
+class MqttConnectorErrorCategory(enum.Enum):
+    CONNECTION = 'connection'
+    INGESTION = 'ingestion'
+
+
+class MqttIngestionError(BaseModel):
+    connector_code: Optional[str]
+    category: MqttConnectorErrorCategory
+    message: str
+    occurrences: int
+    first_seen_at: datetime
+    last_seen_at: datetime
 
 
 class MqttBindingMode(enum.Enum):
@@ -157,6 +170,7 @@ _MetricSamplelistAdapter = TypeAdapter(list[MetricDataSample])
 _SecondarySamplelistAdapter = TypeAdapter(list[SecondaryDataSample])
 _LatestSampleListAdapter = TypeAdapter(list[LatestDataSample])
 _MqttConnectorListAdapter = TypeAdapter(list[MqttConnector])
+_MqttIngestionErrorListAdapter = TypeAdapter(list[MqttIngestionError])
 
 
 class FrameFormat(enum.Enum):
@@ -727,6 +741,12 @@ class MercutoDataService:
             f'{self._path}/connectors/mqtt', 'GET', params={"project": project}
         )
         return _MqttConnectorListAdapter.validate_json(r.text)
+
+    def list_mqtt_errors(self, project: str) -> list[MqttIngestionError]:
+        r = self._client.request(
+            f'{self._path}/connectors/mqtt-errors', 'GET', params={"project": project}
+        )
+        return _MqttIngestionErrorListAdapter.validate_json(r.text)
 
     def get_mqtt_connector(self, code: str) -> Optional[MqttConnector]:
         r = self._client.request(
