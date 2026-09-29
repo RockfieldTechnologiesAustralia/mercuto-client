@@ -156,9 +156,8 @@ class MockMercutoAssetService(MercutoAssetService, metaclass=EnforceOverridesMet
             altitude=altitude,
             metadata=metadata or {},
             channels=[
-                DeviceChannel(field_key=channel.field_key or channel.routed_via or channel.field,
-                              field=channel.field, channel=channel.channel,
-                              routed_via=channel.routed_via, important=channel.important)
+                DeviceChannel(field_key=channel.field_key or channel.field,
+                              field=channel.field, channel=channel.channel, important=channel.important)
                 for channel in (channels or [])
             ],
             children=[],
@@ -206,9 +205,8 @@ class MockMercutoAssetService(MercutoAssetService, metaclass=EnforceOverridesMet
             'altitude': altitude,
             'metadata': metadata or {},
             'channels': [
-                DeviceChannel(field_key=channel.field_key or channel.routed_via or channel.field,
-                              field=channel.field, channel=channel.channel,
-                              routed_via=channel.routed_via, important=channel.important)
+                DeviceChannel(field_key=channel.field_key or channel.field,
+                              field=channel.field, channel=channel.channel, important=channel.important)
                 for channel in (channels or [])
             ],
             'updated_at': datetime.now(UTC),

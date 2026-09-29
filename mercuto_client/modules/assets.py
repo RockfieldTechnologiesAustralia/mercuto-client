@@ -38,10 +38,7 @@ class DeviceChannel(BaseModel):
     field: str
     channel: str
     field_key: Optional[str] = None
-    routed_via: Optional[str] = None
     important: bool = True
-    #: Server-resolved MQTT channel label for self-reporting/routed bindings (read-only; ignored on write).
-    expected_channel_label: Optional[str] = None
 
 
 class MetadataEntry(BaseModel):
@@ -164,16 +161,15 @@ class Display(BaseModel):
 
 # ── Device types ────────────────────────────────────────────────────────────
 #
-# Device types are hardcoded in ``mercuto_core.device_types`` on the server and are no
-# longer user-editable. These models are the flat, read-only projection served by the
-# asset-service; behaviour (label resolution, child validation) never crosses the wire.
+# Device types are hardcoded in ``mercuto_core.device_types`` on the server and are not
+# user-editable. They guide users on the metadata and channels a device usually carries;
+# nothing is enforced against them.
 
 
 class DeviceTypeMetadataField(BaseModel):
     key: str
     label: Optional[str] = None
     data_type: Literal['string', 'number', 'boolean', 'document']
-    required: bool
     multiple: bool
     unit: Optional[str] = None
     description: Optional[str] = None
@@ -182,8 +178,6 @@ class DeviceTypeMetadataField(BaseModel):
 class DeviceTypeChannel(BaseModel):
     field_key: str
     field: str
-    transport: str
-    required: bool
     important: bool
     unit: Optional[str] = None
     description: Optional[str] = None
@@ -196,7 +190,6 @@ class DeviceType(BaseModel):
     model_number: Optional[str] = None
     description: Optional[str] = None
     icon: Optional[str] = None
-    accepts_children: bool
     metadata_fields: list[DeviceTypeMetadataField] = []
     channels: list[DeviceTypeChannel] = []
 
@@ -456,7 +449,7 @@ class MercutoAssetService:
             'altitude': altitude,
         }
         payload['metadata'] = {k: v.model_dump(mode='json') for k, v in (metadata or {}).items()}  # type: ignore[assignment]
-        payload['channels'] = [c.model_dump(mode='json', exclude={'expected_channel_label'}) for c in (channels or [])]  # type: ignore[assignment]
+        payload['channels'] = [c.model_dump(mode='json') for c in (channels or [])]  # type: ignore[assignment]
         r = self._client.request(f"{self._path}/devices", 'POST', json=payload)
         return Device.model_validate_json(r.text)
 
@@ -483,7 +476,7 @@ class MercutoAssetService:
             'altitude': altitude,
         }
         payload['metadata'] = {k: v.model_dump(mode='json') for k, v in (metadata or {}).items()}  # type: ignore[assignment]
-        payload['channels'] = [c.model_dump(mode='json', exclude={'expected_channel_label'}) for c in (channels or [])]  # type: ignore[assignment]
+        payload['channels'] = [c.model_dump(mode='json') for c in (channels or [])]  # type: ignore[assignment]
         r = self._client.request(
             f"{self._path}/devices/{code}", 'PUT', json=payload)
         return Device.model_validate_json(r.text)
