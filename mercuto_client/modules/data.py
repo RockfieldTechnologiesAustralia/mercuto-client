@@ -291,7 +291,7 @@ class MercutoDataService:
 
     def update_channel(self, code: str, label: Optional[str] = None, units: Optional[str] = None,
                        metric: Optional[str] = None, multiplier: Optional[float] = None,
-                       offset: Optional[float] = None) -> Channel:
+                       offset: Optional[float] = None, sampling_period: Optional[timedelta] = None) -> Channel:
         payload: PayloadType = {}
         if label is not None:
             payload['label'] = label
@@ -303,6 +303,8 @@ class MercutoDataService:
             payload['multiplier'] = multiplier
         if offset is not None:
             payload['offset'] = offset
+        if sampling_period is not None:
+            payload['sampling_period'] = serialise_timedelta(sampling_period)
 
         r = self._client.request(
             f'{self._path}/channels/{code}', 'PATCH', json=payload)
