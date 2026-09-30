@@ -291,7 +291,8 @@ class MercutoDataService:
 
     def update_channel(self, code: str, label: Optional[str] = None, units: Optional[str] = None,
                        metric: Optional[str] = None, multiplier: Optional[float] = None,
-                       offset: Optional[float] = None, sampling_period: Optional[timedelta] = None) -> Channel:
+                       offset: Optional[float] = None, sampling_period: Optional[timedelta] = None,
+                       is_wallclock_interval: Optional[bool] = None) -> Channel:
         payload: PayloadType = {}
         if label is not None:
             payload['label'] = label
@@ -305,6 +306,8 @@ class MercutoDataService:
             payload['offset'] = offset
         if sampling_period is not None:
             payload['sampling_period'] = serialise_timedelta(sampling_period)
+        if is_wallclock_interval is not None:
+            payload['is_wallclock_interval'] = is_wallclock_interval
 
         r = self._client.request(
             f'{self._path}/channels/{code}', 'PATCH', json=payload)
@@ -324,13 +327,15 @@ class MercutoDataService:
                        units: Optional[str] = None,
                        aggregate: Optional[str] = None,
                        source: Optional[str] = None,
-                       metric: Optional[str] = None) -> Channel:
+                       metric: Optional[str] = None,
+                       is_wallclock_interval: bool = True) -> Channel:
         payload: PayloadType = {
             'project': project,
             'label': label,
             'classification': classification.value,
             'multiplier': multiplier,
             'offset': offset,
+            'is_wallclock_interval': is_wallclock_interval,
         }
         if sampling_period is not None:
             payload['sampling_period'] = serialise_timedelta(sampling_period)

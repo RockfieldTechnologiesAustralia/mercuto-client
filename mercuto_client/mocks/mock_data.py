@@ -85,7 +85,8 @@ class MockMercutoDataService(MercutoDataService, metaclass=EnforceOverridesMeta)
                        units: Optional[str] = None,
                        aggregate: Optional[str] = None,
                        source: Optional[str] = None,
-                       metric: Optional[str] = None) -> Channel:
+                       metric: Optional[str] = None,
+                       is_wallclock_interval: bool = True) -> Channel:
 
         if multiplier != 1.0:
             logger.warning("MockMercutoDataService does not support channel multiplier.")
@@ -116,14 +117,15 @@ class MockMercutoDataService(MercutoDataService, metaclass=EnforceOverridesMeta)
                           multiplier=multiplier,
                           offset=offset,
                           last_valid_timestamp=None,
-                          is_wallclock_interval=False)
+                          is_wallclock_interval=is_wallclock_interval)
         self._channels[code] = channel
 
         return channel
 
     def update_channel(self, code: str, label: Optional[str] = None, units: Optional[str] = None,
                        metric: Optional[str] = None, multiplier: Optional[float] = None,
-                       offset: Optional[float] = None) -> Channel:
+                       offset: Optional[float] = None, sampling_period: Optional[timedelta] = None,
+                       is_wallclock_interval: Optional[bool] = None) -> Channel:
         if code not in self._channels:
             raise MercutoHTTPException(status_code=404, message="Channel not found")
         channel = self._channels[code]
@@ -137,6 +139,10 @@ class MockMercutoDataService(MercutoDataService, metaclass=EnforceOverridesMeta)
             channel.multiplier = multiplier
         if offset is not None:
             channel.offset = offset
+        if sampling_period is not None:
+            channel.sampling_period = sampling_period
+        if is_wallclock_interval is not None:
+            channel.is_wallclock_interval = is_wallclock_interval
         self._channels[code] = channel
         return channel
 

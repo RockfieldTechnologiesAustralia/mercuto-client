@@ -467,6 +467,7 @@ class MercutoAssetService:
         altitude: Optional[float] = None,
         metadata: Optional[dict[str, MetadataEntry]] = None,
         channels: Optional[list[DeviceChannel]] = None,
+        device_type: Optional[str] = None,
     ) -> Device:
         payload: PayloadType = {
             'label': label,
@@ -475,6 +476,8 @@ class MercutoAssetService:
             'longitude': longitude,
             'altitude': altitude,
         }
+        if device_type is not None:
+            payload['device_type'] = device_type
         payload['metadata'] = {k: v.model_dump(mode='json') for k, v in (metadata or {}).items()}  # type: ignore[assignment]
         payload['channels'] = [c.model_dump(mode='json') for c in (channels or [])]  # type: ignore[assignment]
         r = self._client.request(

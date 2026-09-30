@@ -187,6 +187,7 @@ class MockMercutoAssetService(MercutoAssetService, metaclass=EnforceOverridesMet
         altitude: Optional[float] = None,
         metadata: Optional[dict[str, MetadataEntry]] = None,
         channels: Optional[list[DeviceChannel]] = None,
+        device_type: Optional[str] = None,
     ) -> Device:
         existing = self.get_device(code)
 
@@ -199,6 +200,7 @@ class MockMercutoAssetService(MercutoAssetService, metaclass=EnforceOverridesMet
 
         updated = existing.model_copy(update={
             'label': label,
+            'device_type': device_type if device_type is not None else existing.device_type,
             'parent': parent,
             'latitude': latitude,
             'longitude': longitude,
