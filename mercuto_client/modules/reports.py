@@ -1,6 +1,5 @@
 from datetime import datetime
-from typing import (TYPE_CHECKING, BinaryIO, Literal, Optional, Protocol,
-                    TypedDict)
+from typing import TYPE_CHECKING, BinaryIO, Literal, Optional, Protocol, TypedDict
 
 from pydantic import AwareDatetime, TypeAdapter
 

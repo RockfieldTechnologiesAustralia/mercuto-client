@@ -5,10 +5,16 @@ from typing import Optional
 
 from ..client import MercutoClient
 from ..exceptions import MercutoHTTPException
-from ..modules.connect import (MercutoConnectService, SshServerInfo, SshTunnel,
-                               WireguardEvent, WireguardPeer,
-                               WireguardPeerSummary, WireguardServerInfo,
-                               WireguardSnapshot)
+from ..modules.connect import (
+    MercutoConnectService,
+    SshServerInfo,
+    SshTunnel,
+    WireguardEvent,
+    WireguardPeer,
+    WireguardPeerSummary,
+    WireguardServerInfo,
+    WireguardSnapshot,
+)
 from ._utility import EnforceOverridesMeta
 
 logger = logging.getLogger(__name__)

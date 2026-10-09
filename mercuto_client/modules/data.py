@@ -3,8 +3,8 @@ import os
 import time
 from contextlib import nullcontext
 from datetime import datetime, timedelta
-from typing import (TYPE_CHECKING, Any, BinaryIO, Collection, Literal,
-                    Optional, TextIO, Union)
+from typing import TYPE_CHECKING, Any, BinaryIO, Collection, Literal, Optional, TextIO, Union
+from urllib.parse import quote
 
 from pydantic import TypeAdapter
 
@@ -103,7 +103,63 @@ class MqttConnector(BaseModel):
     enabled: bool
     last_connected_at: Optional[datetime]
     last_message_at: Optional[datetime]
-    last_error: Optional[str]
+
+
+class MqttConnectorErrorCategory(enum.Enum):
+    CONNECTION = 'connection'
+    INGESTION = 'ingestion'
+
+
+class MqttIngestionError(BaseModel):
+    connector_code: Optional[str]
+    category: MqttConnectorErrorCategory
+    message: str
+    occurrences: int
+    first_seen_at: datetime
+    last_seen_at: datetime
+
+
+class MqttBindingMode(enum.Enum):
+    AUTOMATIC = 'automatic'
+    MANUAL = 'manual'
+    SKIPPED = 'skipped'
+
+
+class MqttBindingStatus(enum.Enum):
+    AUTOMATIC_BOUND = 'automatic_bound'
+    AUTOMATIC_CONFLICT = 'automatic_conflict'
+    MANUAL_BOUND = 'manual_bound'
+    MANUAL_UNBOUND = 'manual_unbound'
+    SKIPPED = 'skipped'
+    UNBOUND = 'unbound'
+
+
+class MqttBufferedSample(BaseModel):
+    timestamp: datetime
+    value: float
+
+
+class MqttLastSample(BaseModel):
+    timestamp: datetime
+    value: float
+
+
+class MqttBinding(BaseModel):
+    bind_key: str
+    info: dict[str, str | int | float | bool | None]
+    configured_mode: MqttBindingMode
+    bind_status: MqttBindingStatus
+    bound_channel: Optional[str]
+    first_seen_at: datetime
+    last_seen_at: datetime
+    last_sample: MqttLastSample
+    uncommitted_count: int
+    uncommitted_samples: list[MqttBufferedSample]
+
+
+class MqttBindingPage(BaseModel):
+    items: list[MqttBinding]
+    total: int
 
 
 _ChannellistAdapter = TypeAdapter(list[Channel])
@@ -114,6 +170,7 @@ _MetricSamplelistAdapter = TypeAdapter(list[MetricDataSample])
 _SecondarySamplelistAdapter = TypeAdapter(list[SecondaryDataSample])
 _LatestSampleListAdapter = TypeAdapter(list[LatestDataSample])
 _MqttConnectorListAdapter = TypeAdapter(list[MqttConnector])
+_MqttIngestionErrorListAdapter = TypeAdapter(list[MqttIngestionError])
 
 
 class FrameFormat(enum.Enum):
@@ -234,7 +291,8 @@ class MercutoDataService:
 
     def update_channel(self, code: str, label: Optional[str] = None, units: Optional[str] = None,
                        metric: Optional[str] = None, multiplier: Optional[float] = None,
-                       offset: Optional[float] = None) -> Channel:
+                       offset: Optional[float] = None, sampling_period: Optional[timedelta] = None,
+                       is_wallclock_interval: Optional[bool] = None) -> Channel:
         payload: PayloadType = {}
         if label is not None:
             payload['label'] = label
@@ -246,6 +304,10 @@ class MercutoDataService:
             payload['multiplier'] = multiplier
         if offset is not None:
             payload['offset'] = offset
+        if sampling_period is not None:
+            payload['sampling_period'] = serialise_timedelta(sampling_period)
+        if is_wallclock_interval is not None:
+            payload['is_wallclock_interval'] = is_wallclock_interval
 
         r = self._client.request(
             f'{self._path}/channels/{code}', 'PATCH', json=payload)
@@ -265,13 +327,15 @@ class MercutoDataService:
                        units: Optional[str] = None,
                        aggregate: Optional[str] = None,
                        source: Optional[str] = None,
-                       metric: Optional[str] = None) -> Channel:
+                       metric: Optional[str] = None,
+                       is_wallclock_interval: bool = True) -> Channel:
         payload: PayloadType = {
             'project': project,
             'label': label,
             'classification': classification.value,
             'multiplier': multiplier,
             'offset': offset,
+            'is_wallclock_interval': is_wallclock_interval,
         }
         if sampling_period is not None:
             payload['sampling_period'] = serialise_timedelta(sampling_period)
@@ -685,6 +749,12 @@ class MercutoDataService:
         )
         return _MqttConnectorListAdapter.validate_json(r.text)
 
+    def list_mqtt_errors(self, project: str) -> list[MqttIngestionError]:
+        r = self._client.request(
+            f'{self._path}/connectors/mqtt-errors', 'GET', params={"project": project}
+        )
+        return _MqttIngestionErrorListAdapter.validate_json(r.text)
+
     def get_mqtt_connector(self, code: str) -> Optional[MqttConnector]:
         r = self._client.request(
             f'{self._path}/connectors/mqtt/{code}', 'GET', raise_for_status=False
@@ -748,3 +818,35 @@ class MercutoDataService:
             f'{self._path}/connectors/mqtt/{code}', 'DELETE'
         )
         return r.status_code == 204
+
+    """
+    MQTT Bindings
+    """
+
+    def list_mqtt_bindings(self, project: str, search: Optional[str] = None,
+                           limit: int = 100, offset: int = 0) -> MqttBindingPage:
+        params: PayloadType = {
+            'project': project,
+            'limit': limit,
+            'offset': offset,
+        }
+        if search is not None:
+            params['search'] = search
+        r = self._client.request(
+            f'{self._path}/connectors/mqtt-bindings', 'GET', params=params
+        )
+        return MqttBindingPage.model_validate_json(r.text)
+
+    def update_mqtt_binding(self, project: str, bind_key: str, mode: MqttBindingMode,
+                            destination_channel: Optional[str] = None) -> MqttBinding:
+        payload: PayloadType = {
+            'project': project,
+            'mode': mode.value,
+        }
+        if destination_channel is not None:
+            payload['destination_channel'] = destination_channel
+        encoded_bind_key = quote(bind_key, safe='')
+        r = self._client.request(
+            f'{self._path}/connectors/mqtt-bindings/{encoded_bind_key}', 'PATCH', json=payload
+        )
+        return MqttBinding.model_validate_json(r.text)

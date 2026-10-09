@@ -62,7 +62,7 @@ def test_device_crud(client: MercutoClient) -> None:
         metadata={
             'serial': MetadataEntry(data_type='string', value='SN-001'),
         },
-        channels=[DeviceChannel(field='strain', channel='CH-1')],
+        channels=[DeviceChannel(field_key='strain', field='strain', channel='CH-1')],
     )
 
     fetched_child = client.assets().get_device(child.code)
@@ -81,7 +81,7 @@ def test_device_crud(client: MercutoClient) -> None:
         metadata={
             'tags': MetadataEntry(data_type='string', is_list=True, values=['A', 'B']),
         },
-        channels=[DeviceChannel(field='temperature', channel='CH-2')],
+        channels=[DeviceChannel(field_key='temperature', field='temperature', channel='CH-2')],
     )
     assert updated_child.label == 'Strain Sensor v2'
     assert updated_child.metadata['tags'].is_list is True

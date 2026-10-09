@@ -3,16 +3,14 @@ import json as json_stdlib
 import logging
 import os
 import time
-from typing import (Any, Iterator, Literal, Mapping, Optional, Protocol, Type,
-                    TypeVar)
+from typing import Any, Iterator, Literal, Mapping, Optional, Protocol, Type, TypeVar
 
 import requests
 import requests.cookies
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
-from ._authentication import (IAuthenticationMethod,
-                              create_authentication_method)
+from ._authentication import IAuthenticationMethod, create_authentication_method
 from .exceptions import MercutoClientException, MercutoHTTPException
 from .modules.actions import MercutoActionService
 from .modules.alerts import MercutoAlertService

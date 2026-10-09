@@ -15,4 +15,12 @@
     "autopep8.args": [
         "--max-line-length=150"
     ],
+    // flake8, isort and mypy read their settings from .flake8 and pyproject.toml
+    // (no explicit args needed). "fromEnvironment" uses the tools installed in the
+    // project's virtual env so versions match the GitHub Actions checks.
+    "flake8.importStrategy": "fromEnvironment",
+    "isort.importStrategy": "fromEnvironment",
+    "mypy-type-checker.importStrategy": "fromEnvironment",
+    // Check the whole workspace like CI does, not just the open file.
+    "mypy-type-checker.reportingScope": "workspace"
 }

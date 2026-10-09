@@ -37,7 +37,8 @@ class Project(BaseModel):
 class DeviceChannel(BaseModel):
     field: str
     channel: str
-    source_slot: Optional[str] = None
+    field_key: Optional[str] = None
+    important: bool = True
 
 
 class MetadataEntry(BaseModel):
@@ -159,47 +160,27 @@ class Display(BaseModel):
 
 
 # ── Device types ────────────────────────────────────────────────────────────
+#
+# Device types are hardcoded in ``mercuto_core.device_types`` on the server and are not
+# user-editable. They guide users on the metadata and channels a device usually carries;
+# nothing is enforced against them.
 
 
-class DeviceTypeMetadataFieldDefinition(BaseModel):
-    metadata_key: str
-    description: Optional[str] = None
+class DeviceTypeMetadataField(BaseModel):
+    key: str
+    label: Optional[str] = None
     data_type: Literal['string', 'number', 'boolean', 'document']
-    multiple: bool = False
+    multiple: bool
     unit: Optional[str] = None
+    description: Optional[str] = None
 
 
-class DeviceTypeChannelDefinition(BaseModel):
+class DeviceTypeChannel(BaseModel):
+    field_key: str
     field: str
+    important: bool
+    unit: Optional[str] = None
     description: Optional[str] = None
-
-
-class DeviceTypeChildSpecRequiredMetadataField(BaseModel):
-    key: str
-    data_type: Literal['string', 'number', 'boolean', 'document'] = 'string'
-    multiple: bool = False
-
-
-class DeviceTypeReadingSlot(BaseModel):
-    key: str
-    description: Optional[str] = None
-    channel_label_template: str
-    required: bool = True
-
-
-class DeviceTypeChildSpec(BaseModel):
-    allowed_device_types: list[str] = []
-    required_metadata: list[DeviceTypeChildSpecRequiredMetadataField] = []
-    reading_slots: list[DeviceTypeReadingSlot] = []
-    max_count: Optional[int] = None
-
-
-class DeviceTypeTemplate(BaseModel):
-    version: Literal[1] = 1
-    metadata: list[DeviceTypeMetadataFieldDefinition] = []
-    channels: list[DeviceTypeChannelDefinition] = []
-    reading_slots: list[DeviceTypeReadingSlot] = []
-    children: list[DeviceTypeChildSpec] = []
 
 
 class DeviceType(BaseModel):
@@ -209,9 +190,8 @@ class DeviceType(BaseModel):
     model_number: Optional[str] = None
     description: Optional[str] = None
     icon: Optional[str] = None
-    template: DeviceTypeTemplate
-    created_at: datetime
-    updated_at: datetime
+    metadata_fields: list[DeviceTypeMetadataField] = []
+    channels: list[DeviceTypeChannel] = []
 
 
 # ── Device groups ────────────────────────────────────────────────────────────
@@ -370,7 +350,8 @@ class MercutoAssetService:
             'limit': limit,
             'offset': offset,
         }
-        r = self._client.request(f"{self._path}/projects", 'GET', params=params)
+        r = self._client.request(
+            f"{self._path}/projects", 'GET', params=params)
         return _ProjectListAdapter.validate_json(r.text)
 
     def create_project(
@@ -486,6 +467,7 @@ class MercutoAssetService:
         altitude: Optional[float] = None,
         metadata: Optional[dict[str, MetadataEntry]] = None,
         channels: Optional[list[DeviceChannel]] = None,
+        device_type: Optional[str] = None,
     ) -> Device:
         payload: PayloadType = {
             'label': label,
@@ -494,6 +476,8 @@ class MercutoAssetService:
             'longitude': longitude,
             'altitude': altitude,
         }
+        if device_type is not None:
+            payload['device_type'] = device_type
         payload['metadata'] = {k: v.model_dump(mode='json') for k, v in (metadata or {}).items()}  # type: ignore[assignment]
         payload['channels'] = [c.model_dump(mode='json') for c in (channels or [])]  # type: ignore[assignment]
         r = self._client.request(
@@ -503,62 +487,25 @@ class MercutoAssetService:
     def delete_device(self, code: str) -> None:
         self._client.request(f"{self._path}/devices/{code}", 'DELETE')
 
-    # --- Device types routes ---
+    # --- Device types routes (read-only; catalogue is hardcoded server-side) ---
 
     def list_device_types(self, limit: int = 100, offset: int = 0) -> list[DeviceType]:
         params: PayloadType = {'limit': limit, 'offset': offset}
-        r = self._client.request(f"{self._path}/device-types", 'GET', params=params)
+        r = self._client.request(
+            f"{self._path}/device-types", 'GET', params=params)
         return _DeviceTypeListAdapter.validate_json(r.text)
-
-    def create_device_type(
-        self,
-        label: str,
-        manufacturer: Optional[str] = None,
-        model_number: Optional[str] = None,
-        description: Optional[str] = None,
-        template: Optional[DeviceTypeTemplate] = None,
-    ) -> DeviceType:
-        payload: PayloadType = {
-            'label': label,
-            'manufacturer': manufacturer,
-            'model_number': model_number,
-            'description': description,
-        }
-        payload['template'] = (template or DeviceTypeTemplate()).model_dump(mode='json')  # type: ignore[assignment]
-        r = self._client.request(f"{self._path}/device-types", 'POST', json=payload)
-        return DeviceType.model_validate_json(r.text)
 
     def get_device_type(self, code: str) -> DeviceType:
         r = self._client.request(f"{self._path}/device-types/{code}", 'GET')
         return DeviceType.model_validate_json(r.text)
 
-    def update_device_type(
-        self,
-        code: str,
-        label: str,
-        manufacturer: Optional[str] = None,
-        model_number: Optional[str] = None,
-        description: Optional[str] = None,
-        template: Optional[DeviceTypeTemplate] = None,
-    ) -> DeviceType:
-        payload: PayloadType = {
-            'label': label,
-            'manufacturer': manufacturer,
-            'model_number': model_number,
-            'description': description,
-        }
-        payload['template'] = (template or DeviceTypeTemplate()).model_dump(mode='json')  # type: ignore[assignment]
-        r = self._client.request(f"{self._path}/device-types/{code}", 'PUT', json=payload)
-        return DeviceType.model_validate_json(r.text)
-
-    def delete_device_type(self, code: str) -> None:
-        self._client.request(f"{self._path}/device-types/{code}", 'DELETE')
-
     # --- Device groups routes ---
 
     def list_device_groups(self, project: str, limit: int = 100, offset: int = 0) -> list[DeviceGroup]:
-        params: PayloadType = {'project': project, 'limit': limit, 'offset': offset}
-        r = self._client.request(f"{self._path}/device-groups", 'GET', params=params)
+        params: PayloadType = {'project': project,
+                               'limit': limit, 'offset': offset}
+        r = self._client.request(
+            f"{self._path}/device-groups", 'GET', params=params)
         return _DeviceGroupListAdapter.validate_json(r.text)
 
     def create_device_group(
@@ -583,8 +530,10 @@ class MercutoAssetService:
         else:
             payload['region'] = None
         if annotations is not None:
-            payload['annotations'] = [a.model_dump(mode='json') for a in annotations]  # type: ignore[assignment]
-        r = self._client.request(f"{self._path}/device-groups", 'POST', json=payload)
+            payload['annotations'] = [a.model_dump(  # type: ignore[assignment]
+                mode='json') for a in annotations]
+        r = self._client.request(
+            f"{self._path}/device-groups", 'POST', json=payload)
         return DeviceGroup.model_validate_json(r.text)
 
     def get_device_group(self, code: str) -> DeviceGroup:
@@ -612,8 +561,10 @@ class MercutoAssetService:
         else:
             payload['region'] = None
         if annotations is not None:
-            payload['annotations'] = [a.model_dump(mode='json') for a in annotations]  # type: ignore[assignment]
-        r = self._client.request(f"{self._path}/device-groups/{code}", 'PUT', json=payload)
+            payload['annotations'] = [a.model_dump(  # type: ignore[assignment]
+                mode='json') for a in annotations]
+        r = self._client.request(
+            f"{self._path}/device-groups/{code}", 'PUT', json=payload)
         return DeviceGroup.model_validate_json(r.text)
 
     def delete_device_group(self, code: str) -> None:
@@ -629,12 +580,14 @@ class MercutoAssetService:
         limit: int = 100,
         offset: int = 0,
     ) -> list[Document]:
-        params: PayloadType = {'project': project, 'limit': limit, 'offset': offset}
+        params: PayloadType = {'project': project,
+                               'limit': limit, 'offset': offset}
         if device is not None:
             params['device'] = device
         if tag:
             params['tag'] = tag  # type: ignore[assignment]
-        r = self._client.request(f"{self._path}/documents", 'GET', params=params)
+        r = self._client.request(
+            f"{self._path}/documents", 'GET', params=params)
         return _DocumentListAdapter.validate_json(r.text)
 
     def get_document(self, code: str) -> Document:
@@ -655,7 +608,8 @@ class MercutoAssetService:
             'description': description,
             'tags': tags or [],
         }
-        r = self._client.request(f"{self._path}/documents/{code}", 'PUT', json=payload)
+        r = self._client.request(
+            f"{self._path}/documents/{code}", 'PUT', json=payload)
         return Document.model_validate_json(r.text)
 
     def delete_document(self, code: str) -> None:
@@ -695,5 +649,6 @@ class MercutoAssetService:
             data=data,
         ).raise_for_status()
 
-        r = self._client.request(f"{self._path}/uploads/{session.code}/complete", 'POST')
+        r = self._client.request(
+            f"{self._path}/uploads/{session.code}/complete", 'POST')
         return Document.model_validate_json(r.text)

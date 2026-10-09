@@ -6,8 +6,7 @@ from typing import Optional
 
 from ..client import MercutoClient
 from ..exceptions import MercutoHTTPException
-from ..modules.assets import (Device, DeviceChannel, Healthcheck,
-                              MercutoAssetService, MetadataEntry, Project)
+from ..modules.assets import Device, DeviceChannel, Healthcheck, MercutoAssetService, MetadataEntry, Project
 from ._utility import EnforceOverridesMeta
 
 logger = logging.getLogger(__name__)
@@ -157,7 +156,8 @@ class MockMercutoAssetService(MercutoAssetService, metaclass=EnforceOverridesMet
             altitude=altitude,
             metadata=metadata or {},
             channels=[
-                DeviceChannel(field=channel.field, channel=channel.channel)
+                DeviceChannel(field_key=channel.field_key or channel.field,
+                              field=channel.field, channel=channel.channel, important=channel.important)
                 for channel in (channels or [])
             ],
             children=[],
@@ -187,6 +187,7 @@ class MockMercutoAssetService(MercutoAssetService, metaclass=EnforceOverridesMet
         altitude: Optional[float] = None,
         metadata: Optional[dict[str, MetadataEntry]] = None,
         channels: Optional[list[DeviceChannel]] = None,
+        device_type: Optional[str] = None,
     ) -> Device:
         existing = self.get_device(code)
 
@@ -199,13 +200,15 @@ class MockMercutoAssetService(MercutoAssetService, metaclass=EnforceOverridesMet
 
         updated = existing.model_copy(update={
             'label': label,
+            'device_type': device_type if device_type is not None else existing.device_type,
             'parent': parent,
             'latitude': latitude,
             'longitude': longitude,
             'altitude': altitude,
             'metadata': metadata or {},
             'channels': [
-                DeviceChannel(field=channel.field, channel=channel.channel)
+                DeviceChannel(field_key=channel.field_key or channel.field,
+                              field=channel.field, channel=channel.channel, important=channel.important)
                 for channel in (channels or [])
             ],
             'updated_at': datetime.now(UTC),

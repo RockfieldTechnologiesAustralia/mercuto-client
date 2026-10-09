@@ -4,9 +4,7 @@ import tempfile
 
 import pytest
 
-from ...ingester.parsers import (detect_parser, parse_campbell_file,
-                                 parse_worldsensing_compact_file,
-                                 parse_worldsensing_standard_file)
+from ...ingester.parsers import detect_parser, parse_campbell_file, parse_worldsensing_compact_file, parse_worldsensing_standard_file
 
 RESOURCES_DIR = os.path.join(os.path.dirname(__file__), "resources")
 

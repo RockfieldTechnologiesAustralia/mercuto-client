@@ -484,8 +484,10 @@ class MercutoEventService:
 
     def calibrate(self, config_id: int,
                   vehicles: list[CalibrationVehicle]) -> CalibrationStatus:
+
         body: PayloadType = {'vehicles': [v.model_dump(mode='json') for v in vehicles]}  # type: ignore[dict-item]
-        r = self._client.request(f"{self._path}/processing/{config_id}/calibrate", "POST", json=body)
+        r = self._client.request(
+            f"{self._path}/processing/{config_id}/calibrate", "POST", json=body)
         return CalibrationStatus.model_validate_json(r.text)
 
     # ── Reprocessing ─────────────────────────────────────
