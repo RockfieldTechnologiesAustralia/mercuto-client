@@ -12,7 +12,6 @@ from ..exceptions import MercutoClientException
 from . import PayloadType
 from ._util import BaseModel
 
-CycleCountJobKind = Literal['automated', 'manual']
 CycleCountJobStatus = Literal['pending', 'running', 'ready', 'failed', 'cancelled']
 EventOutcome = Literal['counted', 'no_data', 'failed']
 CoverageBucket = Literal['day', 'week', 'month']
@@ -115,7 +114,7 @@ class CycleCountJobRequest(BaseModel):
     channels: list[str]
     start_time: datetime
     end_time: datetime
-    settings: Optional[CycleCountSettings] = None
+    settings: CycleCountSettings
 
 
 class CycleCountJobProgress(BaseModel):
@@ -128,7 +127,6 @@ class CycleCountJobProgress(BaseModel):
 class CycleCountJob(BaseModel):
     code: str
     project: str
-    kind: CycleCountJobKind
     request: CycleCountJobRequest
     status: CycleCountJobStatus
     message: Optional[str] = None
@@ -177,9 +175,7 @@ class CycleCountResultChannel(BaseModel):
 class CycleCountResult(BaseModel):
     code: str
     project: str
-    kind: CycleCountJobKind
     request: CycleCountJobRequest
-    revisions: list[CycleCountRevision]
     first_event_start: Optional[datetime] = None
     last_event_start: Optional[datetime] = None
     events: CycleCountEventTotals
@@ -296,11 +292,11 @@ class MercutoFatigueService:
 
     # ── Cycle count jobs ───────────────────────────────
 
-    def create_cycle_count_job(self, project: str, kind: CycleCountJobKind, channels: list[str], start_time: datetime,
-                               end_time: datetime, settings: Optional[CycleCountSettings] = None, timeout: float = 0) -> CycleCountJob:
+    def create_cycle_count_job(self, project: str, channels: list[str], start_time: datetime, end_time: datetime,
+                               settings: Optional[CycleCountSettings] = None, timeout: float = 0) -> CycleCountJob:
+        """Settings default to the project's automated settings; automated counts with identical settings are reused."""
         payload: PayloadType = {
             "project": project,
-            "kind": kind,
             "channels": channels,
             "start_time": start_time.isoformat(),
             "end_time": end_time.isoformat(),
