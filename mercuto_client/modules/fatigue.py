@@ -1,5 +1,5 @@
 import time
-from datetime import datetime
+from datetime import date, datetime
 from typing import TYPE_CHECKING, Literal, Optional
 
 import requests as _requests
@@ -70,6 +70,7 @@ class EventCycleCount(BaseModel):
     counts: list[float]
     total_cycles: float
     max_range: float
+    sum_cubed: float
 
 
 class CycleCountStatusTotals(BaseModel):
@@ -84,6 +85,7 @@ class ChannelCoverage(BaseModel):
     events_counted: int
     total_cycles: float
     max_range: Optional[float] = None
+    root_sum_cubed: Optional[float] = None
 
 
 class CoverageBucketCounts(BaseModel):
@@ -164,8 +166,12 @@ class CycleCountResultChannel(BaseModel):
     events_counted: int
     total_cycles: float
     max_range: Optional[float] = None
+    root_sum_cubed: Optional[float] = None
     bins: list[float]
     counts: list[float]
+    days: list[date]
+    daily_sum_cubed: list[float]
+    daily_cycles: list[float]
 
 
 class CycleCountResult(BaseModel):
