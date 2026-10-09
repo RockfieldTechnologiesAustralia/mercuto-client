@@ -178,10 +178,8 @@ class DeviceTypeMetadataField(BaseModel):
 class DeviceTypeChannel(BaseModel):
     field_key: str
     field: str
-    important: bool
     unit: Optional[str] = None
     description: Optional[str] = None
-    unit: Optional[str] = None
     channel_label_template: Optional[str] = None
     required: bool = True
     important: bool = True
