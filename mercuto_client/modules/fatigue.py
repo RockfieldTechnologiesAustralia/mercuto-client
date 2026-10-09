@@ -2,6 +2,7 @@ import time
 from datetime import datetime
 from typing import TYPE_CHECKING, Literal, Optional
 
+import requests as _requests
 from pydantic import Field, TypeAdapter
 
 if TYPE_CHECKING:
@@ -11,9 +12,9 @@ from ..exceptions import MercutoClientException
 from . import PayloadType
 from ._util import BaseModel
 
-CycleCountSource = Literal['stored', 'computed']
-CycleCountSegmentation = Literal['per_event', 'continuous']
-CycleCountJobStatus = Literal['pending', 'running', 'finalizing', 'ready', 'failed', 'cancelled']
+CycleCountJobKind = Literal['automated', 'manual']
+CycleCountJobStatus = Literal['pending', 'running', 'ready', 'failed', 'cancelled']
+EventOutcome = Literal['counted', 'no_data', 'failed']
 CoverageBucket = Literal['day', 'week', 'month']
 
 
@@ -112,31 +113,20 @@ class CycleCountJobRequest(BaseModel):
     channels: list[str]
     start_time: datetime
     end_time: datetime
-    source: CycleCountSource
-    segmentation: CycleCountSegmentation
     settings: Optional[CycleCountSettings] = None
 
 
 class CycleCountJobProgress(BaseModel):
-    segments_total: int
-    segments_done: int
-    segments_no_data: int
-    segments_failed: int
+    events_total: int
+    events_done: int
     rate_per_second: Optional[float] = None
     eta_seconds: Optional[float] = None
-
-
-class CycleCountJobResult(BaseModel):
-    n_rows: int
-    parquet_url: str
-    csv_url: Optional[str] = None
-    summary_url: str
-    urls_expire_at: datetime
 
 
 class CycleCountJob(BaseModel):
     code: str
     project: str
+    kind: CycleCountJobKind
     request: CycleCountJobRequest
     status: CycleCountJobStatus
     message: Optional[str] = None
@@ -146,11 +136,48 @@ class CycleCountJob(BaseModel):
     completed_at: Optional[datetime] = None
     expires_at: datetime
     progress: CycleCountJobProgress
-    result: Optional[CycleCountJobResult] = None
+    result_url: Optional[str] = None
+    result_url_expires_at: Optional[datetime] = None
 
     @property
     def finished(self) -> bool:
         return self.status in ('ready', 'failed', 'cancelled')
+
+
+class CycleCountEventFailure(BaseModel):
+    start_time: datetime
+    event_code: str
+    status: EventOutcome
+    message: Optional[str] = None
+
+
+class CycleCountEventTotals(BaseModel):
+    counted: int
+    no_data: int
+    failed: int
+    reused: int
+    failures: list[CycleCountEventFailure]
+
+
+class CycleCountResultChannel(BaseModel):
+    channel_code: str
+    events_counted: int
+    total_cycles: float
+    max_range: Optional[float] = None
+    bins: list[float]
+    counts: list[float]
+
+
+class CycleCountResult(BaseModel):
+    code: str
+    project: str
+    kind: CycleCountJobKind
+    request: CycleCountJobRequest
+    revisions: list[CycleCountRevision]
+    first_event_start: Optional[datetime] = None
+    last_event_start: Optional[datetime] = None
+    events: CycleCountEventTotals
+    channels: list[CycleCountResultChannel]
 
 
 # ── Connections ────────────────────────────────────────
@@ -263,16 +290,14 @@ class MercutoFatigueService:
 
     # ── Cycle count jobs ───────────────────────────────
 
-    def create_cycle_count_job(self, project: str, channels: list[str], start_time: datetime, end_time: datetime,
-                               source: CycleCountSource, segmentation: CycleCountSegmentation = 'per_event',
-                               settings: Optional[CycleCountSettings] = None, timeout: float = 0) -> CycleCountJob:
+    def create_cycle_count_job(self, project: str, kind: CycleCountJobKind, channels: list[str], start_time: datetime,
+                               end_time: datetime, settings: Optional[CycleCountSettings] = None, timeout: float = 0) -> CycleCountJob:
         payload: PayloadType = {
             "project": project,
+            "kind": kind,
             "channels": channels,
             "start_time": start_time.isoformat(),
             "end_time": end_time.isoformat(),
-            "source": source,
-            "segmentation": segmentation,
         }
         if settings is not None:
             payload["settings"] = settings.model_dump(mode='json')
@@ -305,6 +330,15 @@ class MercutoFatigueService:
             if time.monotonic() > deadline:
                 raise MercutoClientException(f"Cycle count job {code} did not finish within {timeout} seconds")
             time.sleep(poll_interval)
+
+    def get_cycle_count_result(self, code: str) -> CycleCountResult:
+        """Download the result of a `ready` job."""
+        job = self.get_cycle_count_job(code)
+        if job.result_url is None:
+            raise MercutoClientException(f"Cycle count job {code} has no result ({job.status})")
+        response = _requests.get(job.result_url, timeout=60)
+        response.raise_for_status()
+        return CycleCountResult.model_validate_json(response.content)
 
     # ── Connections ────────────────────────────────────
 
