@@ -3,7 +3,7 @@ from datetime import date, datetime
 from typing import TYPE_CHECKING, Literal, Optional
 
 import requests as _requests
-from pydantic import Field, TypeAdapter
+from pydantic import TypeAdapter
 
 if TYPE_CHECKING:
     from ..client import MercutoClient
@@ -12,9 +12,8 @@ from ..exceptions import MercutoClientException
 from . import PayloadType
 from ._util import BaseModel
 
-CycleCountJobStatus = Literal['pending', 'running', 'ready', 'failed', 'cancelled']
-EventOutcome = Literal['counted', 'no_data', 'failed']
-CoverageBucket = Literal['day', 'week', 'month']
+FatigueJobStatus = Literal['pending', 'running', 'ready', 'failed', 'cancelled']
+EventOutcome = Literal['stored', 'counted', 'no_data', 'failed']
 
 
 class Healthcheck(BaseModel):
@@ -30,112 +29,72 @@ class CycleCountSettings(BaseModel):
     reservoir_adjustment: bool
 
 
-class CycleCountRevision(BaseModel):
-    revision: int
-    bin_size: float
-    max_bins: int
-    multiplier: float
-    reservoir_adjustment: bool
-    created_at: datetime
-    created_by: Optional[str] = None
-
-
-class CycleCountChannel(BaseModel):
-    channel_code: str
-    active: bool
-    created_at: datetime
-
-
 class CycleCountConfig(BaseModel):
     project: str
-    revision: CycleCountRevision
-    channels: list[CycleCountChannel]
-    created_at: datetime
-    updated_at: datetime
-
-    def active_channels(self) -> list[str]:
-        return [c.channel_code for c in self.channels if c.active]
+    settings: CycleCountSettings
+    channels: list[str]
 
 
-# ── Stored event cycle counts and coverage ─────────────
+# ── Stored cycle counts ────────────────────────────────
 
-class EventCycleCount(BaseModel):
-    event_code: str
+class ChannelCycleCounts(BaseModel):
     channel_code: str
-    start_time: datetime
-    end_time: datetime
-    revision: int
     bins: list[float]
     counts: list[float]
     total_cycles: float
-    max_range: float
-    sum_cubed: float
-
-
-class CycleCountStatusTotals(BaseModel):
-    counted: int
-    no_data: int
-    failed: int
-
-
-class ChannelCoverage(BaseModel):
-    channel_code: str
-    active: bool
-    events_counted: int
-    total_cycles: float
     max_range: Optional[float] = None
-    root_sum_cubed: Optional[float] = None
 
 
-class CoverageBucketCounts(BaseModel):
-    bucket_start: datetime
-    counted: int
-    no_data: int
-    failed: int
-
-
-class CycleCountCoverage(BaseModel):
+class EventCycleCounts(BaseModel):
     project: str
-    start_time: datetime
-    end_time: datetime
-    bucket: CoverageBucket
-    totals: CycleCountStatusTotals
-    n_project_events: Optional[int] = None
-    first_counted_event: Optional[datetime] = None
-    last_counted_event: Optional[datetime] = None
-    revisions: list[int]
-    channels: list[ChannelCoverage]
-    buckets: list[CoverageBucketCounts]
-
-
-# ── Cycle count jobs ───────────────────────────────────
-
-class CycleCountJobRequest(BaseModel):
-    channels: list[str]
+    event_code: str
     start_time: datetime
     end_time: datetime
     settings: CycleCountSettings
+    channels: list[ChannelCycleCounts]
 
 
-class CycleCountJobProgress(BaseModel):
+class ChannelCycleCountStats(BaseModel):
+    channel_code: str
+    events_stored: int
+
+
+class CycleCountStats(BaseModel):
+    project: str
+    start_time: datetime
+    end_time: datetime
+    n_project_events: Optional[int] = None
+    events_stored: int
+    first_stored_event: Optional[datetime] = None
+    last_stored_event: Optional[datetime] = None
+    channels: list[ChannelCycleCountStats]
+
+
+# ── Fatigue jobs ───────────────────────────────────────
+
+class FatigueJobProgress(BaseModel):
     events_total: int
     events_done: int
     rate_per_second: Optional[float] = None
     eta_seconds: Optional[float] = None
 
 
-class CycleCountJob(BaseModel):
+class FatigueJob(BaseModel):
     code: str
     project: str
-    request: CycleCountJobRequest
-    status: CycleCountJobStatus
+    label: str
+    start_time: datetime
+    end_time: datetime
+    settings: CycleCountSettings
+    channels: list[str]
+    status: FatigueJobStatus
     message: Optional[str] = None
     requested_by: str
     requested_at: datetime
     started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
     expires_at: datetime
-    progress: CycleCountJobProgress
+    progress: FatigueJobProgress
     result_url: Optional[str] = None
     result_url_expires_at: Optional[datetime] = None
 
@@ -144,22 +103,22 @@ class CycleCountJob(BaseModel):
         return self.status in ('ready', 'failed', 'cancelled')
 
 
-class CycleCountEventFailure(BaseModel):
+class FatigueJobEventFailure(BaseModel):
     start_time: datetime
     event_code: str
     status: EventOutcome
     message: Optional[str] = None
 
 
-class CycleCountEventTotals(BaseModel):
+class FatigueJobEventTotals(BaseModel):
+    stored: int
     counted: int
     no_data: int
     failed: int
-    reused: int
-    failures: list[CycleCountEventFailure]
+    failures: list[FatigueJobEventFailure]
 
 
-class CycleCountResultChannel(BaseModel):
+class FatigueJobChannelResult(BaseModel):
     channel_code: str
     events_counted: int
     total_cycles: float
@@ -168,18 +127,40 @@ class CycleCountResultChannel(BaseModel):
     bins: list[float]
     counts: list[float]
     days: list[date]
-    daily_sum_cubed: list[float]
     daily_cycles: list[float]
+    daily_sum_cubed: list[float]
 
 
-class CycleCountResult(BaseModel):
+class FatigueJobConnectionResult(BaseModel):
+    code: str
+    label: str
+    channels: list[str]
+    multiplier: float
+    c_d: float
+    m: float
+    s_0: float
+    initial_date: datetime
+    initial_damage: float
+    days: list[date]
+    daily_damage: list[float]
+    damage_in_range: float
+    damage_at_start: float
+    damage_at_end: float
+    remaining_life_years: Optional[float] = None
+
+
+class FatigueJobResult(BaseModel):
     code: str
     project: str
-    request: CycleCountJobRequest
+    label: str
+    start_time: datetime
+    end_time: datetime
+    settings: CycleCountSettings
     first_event_start: Optional[datetime] = None
     last_event_start: Optional[datetime] = None
-    events: CycleCountEventTotals
-    channels: list[CycleCountResultChannel]
+    events: FatigueJobEventTotals
+    channels: list[FatigueJobChannelResult]
+    connections: list[FatigueJobConnectionResult]
 
 
 # ── Connections ────────────────────────────────────────
@@ -199,17 +180,8 @@ class FatigueConnection(BaseModel):
     channels: list[str]
 
 
-class ConnectionRemnantCapacity(BaseModel):
-    connection: FatigueConnection
-    remaining_life_years: float = Field(description="Remaining life of the connection in years")
-    total_damage: float = Field(description="Total damage accumulated in the connection up to the 'end_time' specified")
-
-
-_CycleCountRevisionListAdapter = TypeAdapter(list[CycleCountRevision])
-_EventCycleCountListAdapter = TypeAdapter(list[EventCycleCount])
-_CycleCountJobListAdapter = TypeAdapter(list[CycleCountJob])
+_FatigueJobListAdapter = TypeAdapter(list[FatigueJob])
 _FatigueConnectionListAdapter = TypeAdapter(list[FatigueConnection])
-_ConnectionRemnantCapacityListAdapter = TypeAdapter(list[ConnectionRemnantCapacity])
 
 
 def _connection_payload(project: str, label: str, multiplier: float, c_d: float, m: float, s_0: float,
@@ -247,6 +219,7 @@ class MercutoFatigueService:
         return CycleCountConfig.model_validate_json(r.text)
 
     def replace_cycle_count_config(self, project: str, settings: CycleCountSettings, channels: list[str]) -> CycleCountConfig:
+        """Changing the settings deletes all stored cycle counts of the project."""
         payload: PayloadType = {
             "project": project,
             "settings": settings.model_dump(mode='json'),
@@ -255,92 +228,65 @@ class MercutoFatigueService:
         r = self._client.request(f"{self._path}/cycle-count-config", "PUT", json=payload)
         return CycleCountConfig.model_validate_json(r.text)
 
-    def list_cycle_count_config_revisions(self, project: str) -> list[CycleCountRevision]:
-        r = self._client.request(f"{self._path}/cycle-count-config/revisions", "GET", params={"project": project})
-        return _CycleCountRevisionListAdapter.validate_json(r.text)
+    # ── Stored cycle counts ────────────────────────────
 
-    # ── Stored event cycle counts ──────────────────────
-
-    def list_event_cycle_counts(self, project: str, start_time: datetime, end_time: datetime,
-                                channels: Optional[list[str]] = None, limit: int = 100, offset: int = 0) -> list[EventCycleCount]:
-        params: PayloadType = {
-            "project": project,
-            "start_time": start_time.isoformat(),
-            "end_time": end_time.isoformat(),
-            "limit": limit,
-            "offset": offset,
-        }
-        if channels is not None:
-            params["channels"] = channels
-        r = self._client.request(f"{self._path}/event-cycle-counts", "GET", params=params)
-        return _EventCycleCountListAdapter.validate_json(r.text)
-
-    def delete_event_cycle_counts(self, project: str, start_time: datetime, end_time: datetime) -> None:
+    def get_cycle_count_stats(self, project: str, start_time: datetime, end_time: datetime) -> CycleCountStats:
         params: PayloadType = {"project": project, "start_time": start_time.isoformat(), "end_time": end_time.isoformat()}
-        self._client.request(f"{self._path}/event-cycle-counts", "DELETE", params=params)
+        r = self._client.request(f"{self._path}/cycle-count-stats", "GET", params=params)
+        return CycleCountStats.model_validate_json(r.text)
 
-    def get_cycle_count_coverage(self, project: str, start_time: datetime, end_time: datetime,
-                                 bucket: CoverageBucket = 'day') -> CycleCountCoverage:
-        params: PayloadType = {
-            "project": project,
-            "start_time": start_time.isoformat(),
-            "end_time": end_time.isoformat(),
-            "bucket": bucket,
-        }
-        r = self._client.request(f"{self._path}/cycle-count-coverage", "GET", params=params)
-        return CycleCountCoverage.model_validate_json(r.text)
+    def get_event_cycle_counts(self, project: str, event: str) -> EventCycleCounts:
+        """Cycle counts of one event; channels without stored counts are counted and stored."""
+        r = self._client.request(f"{self._path}/event-cycle-counts/{event}", "GET", params={"project": project})
+        return EventCycleCounts.model_validate_json(r.text)
 
-    # ── Cycle count jobs ───────────────────────────────
+    # ── Fatigue jobs ───────────────────────────────────
 
-    def create_cycle_count_job(self, project: str, channels: list[str], start_time: datetime, end_time: datetime,
-                               settings: Optional[CycleCountSettings] = None, timeout: float = 0) -> CycleCountJob:
-        """Settings default to the project's automated settings; automated counts with identical settings are reused."""
+    def create_job(self, project: str, label: str, start_time: datetime, end_time: datetime) -> FatigueJob:
         payload: PayloadType = {
             "project": project,
-            "channels": channels,
+            "label": label,
             "start_time": start_time.isoformat(),
             "end_time": end_time.isoformat(),
         }
-        if settings is not None:
-            payload["settings"] = settings.model_dump(mode='json')
-        r = self._client.request(f"{self._path}/cycle-count-jobs", "POST", json=payload, params={"timeout": timeout})
-        return CycleCountJob.model_validate_json(r.text)
+        r = self._client.request(f"{self._path}/jobs", "POST", json=payload)
+        return FatigueJob.model_validate_json(r.text)
 
-    def list_cycle_count_jobs(self, project: str, limit: int = 50, offset: int = 0) -> list[CycleCountJob]:
+    def list_jobs(self, project: str, limit: int = 50, offset: int = 0) -> list[FatigueJob]:
         params: PayloadType = {"project": project, "limit": limit, "offset": offset}
-        r = self._client.request(f"{self._path}/cycle-count-jobs", "GET", params=params)
-        return _CycleCountJobListAdapter.validate_json(r.text)
+        r = self._client.request(f"{self._path}/jobs", "GET", params=params)
+        return _FatigueJobListAdapter.validate_json(r.text)
 
-    def get_cycle_count_job(self, code: str) -> CycleCountJob:
-        r = self._client.request(f"{self._path}/cycle-count-jobs/{code}", "GET")
-        return CycleCountJob.model_validate_json(r.text)
+    def get_job(self, code: str) -> FatigueJob:
+        r = self._client.request(f"{self._path}/jobs/{code}", "GET")
+        return FatigueJob.model_validate_json(r.text)
 
-    def cancel_cycle_count_job(self, code: str) -> CycleCountJob:
-        r = self._client.request(f"{self._path}/cycle-count-jobs/{code}/cancel", "POST")
-        return CycleCountJob.model_validate_json(r.text)
+    def cancel_job(self, code: str) -> FatigueJob:
+        r = self._client.request(f"{self._path}/jobs/{code}/cancel", "POST")
+        return FatigueJob.model_validate_json(r.text)
 
-    def delete_cycle_count_job(self, code: str) -> None:
-        self._client.request(f"{self._path}/cycle-count-jobs/{code}", "DELETE")
+    def delete_job(self, code: str) -> None:
+        self._client.request(f"{self._path}/jobs/{code}", "DELETE")
 
-    def wait_for_cycle_count_job(self, code: str, timeout: float = 600, poll_interval: float = 2) -> CycleCountJob:
+    def wait_for_job(self, code: str, timeout: float = 600, poll_interval: float = 2) -> FatigueJob:
         """Poll a job until it finishes. Raises if it has not finished within ``timeout`` seconds."""
         deadline = time.monotonic() + timeout
         while True:
-            job = self.get_cycle_count_job(code)
+            job = self.get_job(code)
             if job.finished:
                 return job
             if time.monotonic() > deadline:
-                raise MercutoClientException(f"Cycle count job {code} did not finish within {timeout} seconds")
+                raise MercutoClientException(f"Fatigue job {code} did not finish within {timeout} seconds")
             time.sleep(poll_interval)
 
-    def get_cycle_count_result(self, code: str) -> CycleCountResult:
+    def get_job_result(self, code: str) -> FatigueJobResult:
         """Download the result of a `ready` job."""
-        job = self.get_cycle_count_job(code)
+        job = self.get_job(code)
         if job.result_url is None:
-            raise MercutoClientException(f"Cycle count job {code} has no result ({job.status})")
+            raise MercutoClientException(f"Fatigue job {code} has no result ({job.status})")
         response = _requests.get(job.result_url, timeout=60)
         response.raise_for_status()
-        return CycleCountResult.model_validate_json(response.content)
+        return FatigueJobResult.model_validate_json(response.content)
 
     # ── Connections ────────────────────────────────────
 
@@ -372,11 +318,3 @@ class MercutoFatigueService:
 
     def delete_connection(self, code: str) -> None:
         self._client.request(f"{self._path}/connections/{code}", "DELETE")
-
-    def list_remnant_capacities(self, project: str, start_time: datetime, end_time: datetime,
-                                connections: Optional[list[str]] = None) -> list[ConnectionRemnantCapacity]:
-        params: PayloadType = {"project": project, "start_time": start_time.isoformat(), "end_time": end_time.isoformat()}
-        if connections is not None:
-            params["connections"] = connections
-        r = self._client.request(f"{self._path}/remnant-capacities", "GET", params=params)
-        return _ConnectionRemnantCapacityListAdapter.validate_json(r.text)
