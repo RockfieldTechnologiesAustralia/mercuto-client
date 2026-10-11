@@ -236,7 +236,7 @@ class MercutoFatigueService:
         return CycleCountStats.model_validate_json(r.text)
 
     def get_event_cycle_counts(self, project: str, event: str) -> EventCycleCounts:
-        """Cycle counts of one event; channels without stored counts are counted and stored."""
+        """Stored cycle counts of one event. Raises a 404 if the event has none; reprocess the event to count them."""
         r = self._client.request(f"{self._path}/event-cycle-counts/{event}", "GET", params={"project": project})
         return EventCycleCounts.model_validate_json(r.text)
 
