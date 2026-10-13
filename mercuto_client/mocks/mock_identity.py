@@ -40,7 +40,6 @@ class MockMercutoIdentityService(MercutoIdentityService, metaclass=EnforceOverri
 
         # In-memory stores for mock data
         self._users: dict[str, User] = {}
-        self._user_details: dict[str, UserDetails] = {}
         self._tenants: dict[str, Tenant] = {}
         self._permission_groups: dict[str, PermissionGroup] = {}
 
@@ -82,9 +81,9 @@ class MockMercutoIdentityService(MercutoIdentityService, metaclass=EnforceOverri
         default_password: Optional[str] = None
     ) -> User:
         code = str(uuid.uuid4())
-        user = User(code=code, username=username, description=description, tenant=tenant, permission_group=group)
+        user = User(code=code, username=username, description=description, tenant=tenant, permission_group=group,
+                    details=UserDetails())
         self._users[code] = user
-        self._user_details[code] = UserDetails(code=code, username=username)
         return user
 
     def get_current_user(self) -> CurrentUser:
@@ -109,33 +108,26 @@ class MockMercutoIdentityService(MercutoIdentityService, metaclass=EnforceOverri
     def delete_user(self, code: str) -> None:
         if code in self._users:
             del self._users[code]
-        if code in self._user_details:
-            del self._user_details[code]
         for k, v in list(self._api_keys.items()):
             if v.user == code:
                 del self._api_keys[k]
 
-    def get_user_details(self, code: str) -> UserDetails:
-        return self._user_details[code]
-
-    def set_user_details(
+    def edit_user(
         self,
         code: str,
-        email_address: Optional[str] = None,
-        mobile_number: Optional[str] = None,
-        first_name: Optional[str] = None,
-        last_name: Optional[str] = None
-    ) -> UserDetails:
-        user_details = self._user_details[code]
-        if email_address is not None:
-            user_details.email_address = email_address
-        if mobile_number is not None:
-            user_details.mobile_number = mobile_number
-        if first_name is not None:
-            user_details.first_name = first_name
-        if last_name is not None:
-            user_details.last_name = last_name
-        return user_details
+        description: Optional[str] = None,
+        group: Optional[str] = None,
+        details: Optional[UserDetails] = None,
+    ) -> User:
+        user = self._users[code]
+        if description is not None:
+            user.description = description
+        if group is not None:
+            user.permission_group = group
+        if details is not None:
+            existing = user.details or UserDetails()
+            user.details = existing.model_copy(update=details.model_dump(exclude_unset=True))
+        return user
 
     def get_user_api_keys(self, user: str) -> list[HiddenUserAPIKey]:
         return [v.hidden for v in self._api_keys.values() if v.user == user]
