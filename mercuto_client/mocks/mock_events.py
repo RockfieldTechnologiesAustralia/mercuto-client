@@ -1,11 +1,11 @@
 import logging
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from ..client import MercutoClient
 from ..exceptions import MercutoHTTPException
-from ..modules.events import Axle, EditVehicleIn, Event, Tag, Vehicle
+from ..modules.events import Axle, EditVehicleIn, Event, EventStatistics, LatestEvent, Tag, Vehicle
 
 logger = logging.getLogger(__name__)
 
@@ -142,3 +142,28 @@ class MockMercutoEventService:
         if idx >= len(candidates):
             raise MercutoHTTPException("No adjacent event found", 404)
         return candidates[idx]
+
+    # ── Statistics ────────────────────────────────────────
+
+    def get_event_statistics(self, project: str,
+                             start_time: Optional[datetime] = None,
+                             end_time: Optional[datetime] = None) -> EventStatistics:
+        items = sorted((e for e in self._events.values() if e.project == project), key=lambda e: e.start_time)
+        now = datetime.now(timezone.utc)
+
+        def since(delta: timedelta) -> int:
+            return sum(1 for e in items if e.start_time >= now - delta)
+
+        n_in_range: Optional[int] = None
+        if start_time is not None or end_time is not None:
+            n_in_range = sum(1 for e in items
+                             if (start_time is None or e.start_time >= start_time) and (end_time is None or e.start_time <= end_time))
+        latest = items[-1] if items else None
+        return EventStatistics(
+            n_events_last_week=since(timedelta(weeks=1)),
+            n_events_last_month=since(timedelta(days=30)),
+            n_events_last_year=since(timedelta(days=365)),
+            n_events_all_time=len(items),
+            n_events_in_range=n_in_range,
+            latest_event=LatestEvent(code=latest.code, start_time=latest.start_time, end_time=latest.end_time) if latest else None,
+        )
