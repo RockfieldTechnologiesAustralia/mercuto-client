@@ -13,7 +13,6 @@ from . import PayloadType
 from ._util import BaseModel
 
 FatigueJobStatus = Literal['pending', 'running', 'ready', 'failed', 'cancelled']
-EventOutcome = Literal['stored', 'counted', 'no_data', 'failed']
 
 
 class Healthcheck(BaseModel):
@@ -103,19 +102,9 @@ class FatigueJob(BaseModel):
         return self.status in ('ready', 'failed', 'cancelled')
 
 
-class FatigueJobEventFailure(BaseModel):
-    start_time: datetime
-    event_code: str
-    status: EventOutcome
-    message: Optional[str] = None
-
-
 class FatigueJobEventTotals(BaseModel):
-    stored: int
-    counted: int
+    with_cycles: int
     no_data: int
-    failed: int
-    failures: list[FatigueJobEventFailure]
 
 
 class FatigueJobChannelResult(BaseModel):
