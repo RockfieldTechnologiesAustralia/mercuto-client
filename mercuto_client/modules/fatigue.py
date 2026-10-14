@@ -84,6 +84,8 @@ class FatigueJob(BaseModel):
     label: str
     start_time: datetime
     end_time: datetime
+    data_start_time: datetime
+    data_end_time: datetime
     settings: CycleCountSettings
     channels: list[str]
     status: FatigueJobStatus
@@ -144,6 +146,8 @@ class FatigueJobResult(BaseModel):
     label: str
     start_time: datetime
     end_time: datetime
+    data_start_time: datetime
+    data_end_time: datetime
     settings: CycleCountSettings
     first_event_start: Optional[datetime] = None
     last_event_start: Optional[datetime] = None
