@@ -31,13 +31,17 @@ class HiddenUserAPIKey(BaseModel):
 
 
 class UserDetails(BaseModel):
-    code: str
-    username: Optional[str] = None
     email_address: Optional[str] = None
     mobile_number: Optional[str] = None
     first_name: Optional[str] = None
     last_name: Optional[str] = None
-    api_keys: list[HiddenUserAPIKey] = []
+
+
+class UserActivitySummary(BaseModel):
+    first_seen: Optional[str] = None
+    last_seen: Optional[str] = None
+    session_count: int
+    relative_activity: int
 
 
 class User(BaseModel):
@@ -46,6 +50,9 @@ class User(BaseModel):
     description: str
     tenant: str
     permission_group: str
+    details: Optional[UserDetails] = None
+    is_sso: bool = False
+    activity: Optional[UserActivitySummary] = None
 
 
 class CurrentUser(BaseModel):
@@ -119,7 +126,7 @@ class MercutoIdentityService:
             "group_code": group,
             "default_password": default_password,
         }
-        r = self._client.request(f"{self._path}/users", "PUT", json=payload)
+        r = self._client.request(f"{self._path}/users", "POST", json=payload)
         return User.model_validate_json(r.text)
 
     def get_current_user(self) -> CurrentUser:
@@ -136,39 +143,26 @@ class MercutoIdentityService:
     def edit_user(
         self,
         code: str,
-        description: str,
-        group: str
+        description: Optional[str] = None,
+        group: Optional[str] = None,
+        details: Optional[UserDetails] = None,
     ) -> User:
-        payload: PayloadType = {
-            "description": description,
-            "group_code": group,
-        }
+        """
+        Update a user. Only the arguments given are changed. Within `details`, only fields that were explicitly set are
+        changed, and setting a field to None clears it.
+        """
+        payload: PayloadType = {}
+        if description is not None:
+            payload["description"] = description
+        if group is not None:
+            payload["group_code"] = group
+        if details is not None:
+            payload["details"] = details.model_dump(exclude_unset=True)
         r = self._client.request(f"{self._path}/users/{code}", "PATCH", json=payload)
         return User.model_validate_json(r.text)
 
-    def get_user_details(self, code: str) -> UserDetails:
-        r = self._client.request(f"{self._path}/users/{code}/details", "GET")
-        return UserDetails.model_validate_json(r.text)
-
-    def set_user_details(
-        self,
-        code: str,
-        email_address: Optional[str] = None,
-        mobile_number: Optional[str] = None,
-        first_name: Optional[str] = None,
-        last_name: Optional[str] = None
-    ) -> UserDetails:
-        payload: PayloadType = {
-            "email_address": email_address,
-            "mobile_number": mobile_number,
-            "first_name": first_name,
-            "last_name": last_name,
-        }
-        r = self._client.request(f"{self._path}/users/{code}/details", "PATCH", json=payload)
-        return UserDetails.model_validate_json(r.text)
-
     def get_user_api_keys(self, user: str) -> list[HiddenUserAPIKey]:
-        r = self._client.request(f"{self._path}/users/{user}/api_keys", "GET")
+        r = self._client.request(f"{self._path}/users/{user}/api-keys", "GET")
         return _HiddenUserAPIKeylistAdapter.validate_json(r.text)
 
     def generate_api_key_for_user(
@@ -181,11 +175,11 @@ class MercutoIdentityService:
             "description": description,
             "custom_policy": custom_policy,
         }
-        r = self._client.request(f"{self._path}/users/{user}/api_keys", "POST", json=payload)
+        r = self._client.request(f"{self._path}/users/{user}/api-keys", "POST", json=payload)
         return VisibleUserAPIKey.model_validate_json(r.text)
 
     def delete_api_key(self, user: str, key_code: str) -> None:
-        self._client.request(f"{self._path}/users/{user}/api_keys/{key_code}", "DELETE")
+        self._client.request(f"{self._path}/users/{user}/api-keys/{key_code}", "DELETE")
 
     # --- Tenants routes ---
 
@@ -208,7 +202,7 @@ class MercutoIdentityService:
             "description": description,
             "logo_url": logo_url,
         }
-        r = self._client.request(f"{self._path}/tenants", "PUT", json=payload)
+        r = self._client.request(f"{self._path}/tenants", "POST", json=payload)
         return Tenant.model_validate_json(r.text)
 
     # --- Permission Groups routes ---
@@ -217,7 +211,7 @@ class MercutoIdentityService:
         params: PayloadType = {}
         if tenant is not None:
             params["tenant"] = tenant
-        r = self._client.request(f"{self._path}/permissions", "GET", params=params)
+        r = self._client.request(f"{self._path}/permission-groups", "GET", params=params)
         return _PermissionGrouplistAdapter.validate_json(r.text)
 
     def create_permission_group(
@@ -231,24 +225,27 @@ class MercutoIdentityService:
             "label": label,
             "acl_policy": acl_policy,
         }
-        r = self._client.request(f"{self._path}/permissions", "PUT", json=payload)
+        r = self._client.request(f"{self._path}/permission-groups", "POST", json=payload)
         return PermissionGroup.model_validate_json(r.text)
 
     def get_permission_group(self, group: str) -> PermissionGroup:
-        r = self._client.request(f"{self._path}/permissions/{group}", "GET")
+        r = self._client.request(f"{self._path}/permission-groups/{group}", "GET")
         return PermissionGroup.model_validate_json(r.text)
 
     def delete_permission_group(self, group: str) -> None:
-        self._client.request(f"{self._path}/permissions/{group}", "DELETE")
+        self._client.request(f"{self._path}/permission-groups/{group}", "DELETE")
 
     def modify_permission_group(
         self,
         group: str,
-        label: str,
-        acl_policy: str
-    ) -> None:
-        payload: PayloadType = {
-            "label": label,
-            "acl_policy": acl_policy,
-        }
-        self._client.request(f"{self._path}/permissions/{group}", "PATCH", json=payload)
+        label: Optional[str] = None,
+        acl_policy: Optional[str] = None
+    ) -> PermissionGroup:
+        """Update a permission group. Only the arguments given are changed."""
+        payload: PayloadType = {}
+        if label is not None:
+            payload["label"] = label
+        if acl_policy is not None:
+            payload["acl_policy"] = acl_policy
+        r = self._client.request(f"{self._path}/permission-groups/{group}", "PATCH", json=payload)
+        return PermissionGroup.model_validate_json(r.text)
