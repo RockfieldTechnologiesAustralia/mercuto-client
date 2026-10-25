@@ -40,7 +40,7 @@ class Tag(BaseModel):
 class Axle(BaseModel):
     axle_index: int
     position_m: float
-    crossing_time: datetime
+    crossing_time: Optional[datetime] = None
     mass_kg: Optional[float] = None
     confidence: Optional[float] = None
 
@@ -112,11 +112,29 @@ class BridgeSpanType(Enum):
     BEARING_STRAINS_BOTH_SIDES = 'bearing-strains-both-sides'
 
 
+class GroupCombineMode(Enum):
+    SUM = 'sum'
+    MAX_RESPONSE = 'max-response'
+
+
+class AxleDetectionMethod(Enum):
+    PEAK_TO_PEAK = 'peak-to-peak'
+    STEP_CHANGE = 'step-change'
+
+
+class AxleGroupingMethod(Enum):
+    ABSOLUTE = 'absolute'
+    RELATIVE = 'relative'
+    AUTO = 'auto'
+
+
 class GirderGroupConfig(BaseModel):
     channels: dict[str, float]
+    combine: GroupCombineMode = GroupCombineMode.SUM
 
 
 class VelocityEstimationConfig(BaseModel):
+    enabled: bool = True
     source_channel_a: str
     source_channel_b: str
     sensor_spacing_m: float
@@ -132,10 +150,12 @@ class AxleDetectionConfig(BaseModel):
     skew_deg: float = 0.0
     group_1: Optional[GirderGroupConfig] = None
     group_2: Optional[GirderGroupConfig] = None
+    detection_method: AxleDetectionMethod = AxleDetectionMethod.PEAK_TO_PEAK
+    grouping_method: AxleGroupingMethod = AxleGroupingMethod.AUTO
 
 
 class MassEstimationConfig(BaseModel):
-    span_length_m: float
+    span_length_m: float | list[float]
     strain_group: GirderGroupConfig
     span_type: BridgeSpanType = BridgeSpanType.BENDING_STRAINS
     skew_deg: float = 0.0
@@ -145,24 +165,32 @@ class MassEstimationConfig(BaseModel):
     group_load_sharing_ratio: Optional[float] = None
     generate_debug_plots: bool = False
     metric_channel: Optional[str] = None
+    min_axle_mass_kg: float = 1000.0
+    transverse_correction: Optional[list[float]] = None
+    sensor_span_index: Optional[int] = None
+    ei_ratios: Optional[list[float]] = None
 
 
 class VehicleBWimConfig(BaseModel):
+    enabled: bool = True
     axle_detection: AxleDetectionConfig
     mass_estimation: MassEstimationConfig
 
 
 class LoadDistributionConfig(BaseModel):
+    enabled: bool = True
     group: GirderGroupConfig
     metric_channel: Optional[str] = None
 
 
 class AggregationConfig(BaseModel):
+    enabled: bool = True
     aggregate: str
     options: Optional[dict[str, Any]] = None
 
 
 class DynamicAmplificationConfig(BaseModel):
+    enabled: bool = True
     minimum_frequency: float = 0.5
     maximum_frequency: float = 8.0
     filter_order: int = 5
@@ -203,6 +231,7 @@ class CalibrationEventResult(BaseModel):
     # None when the event could not be weighed; failure_reason then explains why.
     raw_strain_measurement: Optional[float] = None
     derived_kg_per_strain: Optional[float] = None
+    transverse_centroid_m: Optional[float] = None
     failure_reason: Optional[str] = None
 
 
@@ -214,6 +243,8 @@ class CalibrationMetadata(BaseModel):
     calibration_vehicles: list[CalibrationVehicle] = []
     computed_calibration_events: list[CalibrationEventResult] = []
     optimal_kg_per_strain: Optional[float] = None
+    derived_ei_ratios: Optional[list[float]] = None
+    derived_transverse_correction: Optional[list[float]] = None
     report_url: Optional[str] = None
     # True when the processing config changed in a way that affects calibration since it was computed.
     is_outdated: bool = False
@@ -258,22 +289,22 @@ JobStatus = Literal['IN_PROGRESS', 'COMPLETED', 'FAILED', 'CANCELLED']
 class ServiceProgress(BaseModel):
     last_completed_event: Optional[str] = None
     completed_count: int = 0
-    updated_at: Optional[datetime] = None
+    updated_at: Optional[AwareDatetime] = None
 
 
 class FailedEvent(BaseModel):
     event_code: str
     message: Optional[str] = None
-    failed_at: datetime
+    failed_at: AwareDatetime
 
 
 class ReprocessingJob(BaseModel):
     job_id: str
     project: str
     requested_by: str
-    requested_at: datetime
-    time_range_start: datetime
-    time_range_end: datetime
+    requested_at: AwareDatetime
+    time_range_start: AwareDatetime
+    time_range_end: AwareDatetime
     status: JobStatus
     total_events: int
     progress: ServiceProgress = ServiceProgress()
@@ -291,8 +322,8 @@ _EventListAdapter = TypeAdapter(list[Event])
 
 class LatestEvent(BaseModel):
     code: str
-    start_time: datetime
-    end_time: datetime
+    start_time: AwareDatetime
+    end_time: AwareDatetime
 
 
 class EventStatistics(BaseModel):
