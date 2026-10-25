@@ -107,3 +107,25 @@ def test_cannot_delete_project_with_devices(client: MercutoClient) -> None:
 
     with pytest.raises(MercutoHTTPException, match='still has devices'):
         client.assets().delete_project(project.code)
+
+
+@pytest.mark.parametrize('function', [None, 'cable_tension', 'unregistered_function'])
+def test_device_function(client: MercutoClient, function: str | None) -> None:
+    assets = client.assets()
+    project = assets.create_project(tenant='tenant-a', name='Bridge A')
+    plain = assets.create_device(project=project.code, label='Plain sensor', device_type='sensor')
+    assert plain.function is None
+    device = assets.create_device(project=project.code, label='PSA', device_type='worldsensing-psa', function=function)
+    assert device.function == function
+    assert assets.get_device(device.code).function == function
+    assert assets.update_device(code=device.code, label='Renamed PSA').function == function
+    assert assets.get_device(device.code).function == function
+    updated = assets.update_device(code=device.code, label='PSA', function='natural_frequency')
+    assert updated.function == 'natural_frequency'
+    assert assets.get_device(device.code).function == 'natural_frequency'
+    assert assets.list_devices(project.code)[0].function == 'natural_frequency'
+    assert assets.update_device(code=device.code, label='PSA').function == 'natural_frequency'
+    cleared = assets.update_device(code=device.code, label='PSA', function=None)
+    assert cleared.function is None
+    assert assets.get_device(device.code).function is None
+    assert assets.update_device(code=device.code, label='PSA').function is None

@@ -32,6 +32,33 @@ with MercutoClient.as_credentials(api_key='<YOUR API KEY>') as client:
     print(client.core().list_projects())
 ```
 
+## Device functions
+
+Device types can declare functions with additional suggested metadata fields and channels.
+Use `device_type.functions` or `device_type.get_function(key)` to look them up;
+`get_function` returns `None` for an unknown key. Types without functions have an empty list.
+A device records its selected function in `device.function` (`None` when unset).
+
+```python
+assets = client.assets()
+device_type = assets.get_device_type(device_type_code)
+function = device_type.get_function("natural_frequency")
+if function is not None:
+    device = assets.create_device(
+        project=project_code,
+        label="Deck vibration meter",
+        device_type=device_type.code,
+        function=function.key,
+    )
+    # Omitting function preserves the current selection.
+    assets.update_device(code=device.code, label="Renamed vibration meter")
+    # Explicit None clears it; a string selects a different function.
+    assets.update_device(code=device.code, label=device.label, function=None)
+```
+
+The server validates the selected function against the device type. The mock client
+stores the value without validating it, with the same keep/set/clear update behaviour.
+
 ## Current Status
 This library is incomplete and may not be fully compliant with the latest Mercuto version. It is only updated periodically and provided for use without any warranty or guarantees.
 

@@ -1,4 +1,5 @@
 from datetime import datetime
+from enum import Enum
 from typing import TYPE_CHECKING, Any, Literal, Optional
 
 import requests as _requests
@@ -9,6 +10,13 @@ if TYPE_CHECKING:
 
 from . import PayloadType
 from ._util import BaseModel
+
+
+class _Unset(Enum):
+    VALUE = 0
+
+
+_UNSET: _Unset = _Unset.VALUE
 
 
 class Project(BaseModel):
@@ -60,6 +68,7 @@ class Device(BaseModel):
     project: str
     label: str
     device_type: str
+    function: Optional[str] = None
     parent: Optional[str] = None
     latitude: Optional[float] = None
     longitude: Optional[float] = None
@@ -162,8 +171,8 @@ class Display(BaseModel):
 # ── Device types ────────────────────────────────────────────────────────────
 #
 # Device types are hardcoded in ``mercuto_core.device_types`` on the server and are not
-# user-editable. They guide users on the metadata and channels a device usually carries;
-# nothing is enforced against them.
+# user-editable. Metadata and channels are suggestions; the server validates a selected
+# function against those declared by the device type.
 
 
 class DeviceTypeMetadataField(BaseModel):
@@ -185,6 +194,14 @@ class DeviceTypeChannel(BaseModel):
     important: bool = True
 
 
+class DeviceTypeFunction(BaseModel):
+    key: str
+    label: str
+    description: Optional[str] = None
+    metadata_fields: list[DeviceTypeMetadataField] = []
+    channels: list[DeviceTypeChannel] = []
+
+
 class DeviceType(BaseModel):
     code: str
     label: str
@@ -194,6 +211,10 @@ class DeviceType(BaseModel):
     icon: Optional[str] = None
     metadata_fields: list[DeviceTypeMetadataField] = []
     channels: list[DeviceTypeChannel] = []
+    functions: list[DeviceTypeFunction] = []
+
+    def get_function(self, key: str) -> Optional[DeviceTypeFunction]:
+        return next((function for function in self.functions if function.key == key), None)
 
 
 # ── Device groups ────────────────────────────────────────────────────────────
@@ -440,11 +461,13 @@ class MercutoAssetService:
         altitude: Optional[float] = None,
         metadata: Optional[dict[str, MetadataEntry]] = None,
         channels: Optional[list[DeviceChannel]] = None,
+        function: Optional[str] = None,
     ) -> Device:
         payload: PayloadType = {
             'project': project,
             'label': label,
             'device_type': device_type,
+            'function': function,
             'parent': parent,
             'latitude': latitude,
             'longitude': longitude,
@@ -470,7 +493,9 @@ class MercutoAssetService:
         metadata: Optional[dict[str, MetadataEntry]] = None,
         channels: Optional[list[DeviceChannel]] = None,
         device_type: Optional[str] = None,
+        function: str | None | _Unset = _UNSET,
     ) -> Device:
+        """Update a device; omit function to keep it, or pass None to clear it."""
         payload: PayloadType = {
             'label': label,
             'parent': parent,
@@ -480,6 +505,8 @@ class MercutoAssetService:
         }
         if device_type is not None:
             payload['device_type'] = device_type
+        if not isinstance(function, _Unset):
+            payload['function'] = function
         payload['metadata'] = {k: v.model_dump(mode='json') for k, v in (metadata or {}).items()}  # type: ignore[assignment]
         payload['channels'] = [c.model_dump(mode='json') for c in (channels or [])]  # type: ignore[assignment]
         r = self._client.request(
