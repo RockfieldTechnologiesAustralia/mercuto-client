@@ -11,6 +11,8 @@ if TYPE_CHECKING:
 from . import PayloadType
 from ._util import BaseModel
 
+AlarmCategory = Literal['system', 'measurement']
+
 
 class Healthcheck(BaseModel):
     status: str
@@ -48,6 +50,7 @@ class Alarm(BaseModel):
     project: str
     label: str
     severity: int
+    category: AlarmCategory
     contact_group: Optional[str]
     check_type: Literal['event', 'interval']
     condition_groups: list[AlarmConditionGroup]
@@ -81,6 +84,7 @@ class AlarmLog(BaseModel):
     acknowledged_at: Optional[AwareDatetime]
     event: Optional[str]
     severity: int
+    category: AlarmCategory
     alarm: str
     condition_logs: list[ConditionLog]
     total_condition_logs: int
@@ -136,9 +140,12 @@ class MercutoAlertService:
         return _ConditionLogListAdapter.validate_json(r.text)
 
     # --- Alarms ---
-    def list_alarms(self, project: str) -> list[Alarm]:
+    def list_alarms(self, project: str, category: Optional[AlarmCategory] = None) -> list[Alarm]:
+        params: PayloadType = {"project": project}
+        if category is not None:
+            params["category"] = category
         r = self._client.request(
-            f"{self._path}/alarms", "GET", params={"project": project})
+            f"{self._path}/alarms", "GET", params=params)
         return _AlarmListAdapter.validate_json(r.text)
 
     def create_alarm(self, /, **args: Any) -> Alarm:
@@ -161,11 +168,14 @@ class MercutoAlertService:
     # --- Alarm Logs ---
     def list_alarm_logs(self, project: str,
                         alarm: Optional[str] = None,
-                        acknowledged: Literal['yes', 'no', 'any'] = 'any') -> list[AlarmLog]:
+                        acknowledged: Literal['yes', 'no', 'any'] = 'any',
+                        category: Optional[AlarmCategory] = None) -> list[AlarmLog]:
         params: PayloadType = {"project": project,
                                "acknowledged": acknowledged}
         if alarm is not None:
             params["alarm"] = alarm
+        if category is not None:
+            params["category"] = category
         r = self._client.request(
             f"{self._path}/alarm-logs", "GET", params=params)
         return _AlarmLogListAdapter.validate_json(r.text)
