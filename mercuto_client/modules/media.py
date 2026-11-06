@@ -1,8 +1,8 @@
 import os
 from datetime import timedelta
-from typing import TYPE_CHECKING, Literal, Optional
+from typing import TYPE_CHECKING, Annotated, Literal, Optional
 
-from pydantic import TypeAdapter
+from pydantic import Field, TypeAdapter
 
 if TYPE_CHECKING:
     from ..client import MercutoClient
@@ -57,7 +57,9 @@ class Healthcheck(BaseModel):
 
 
 class CameraTrigger(BaseModel):
+    """Collects video for an event when `trigger_channel` crosses a threshold during the event."""
     trigger_channel: str
+    trigger_type: Literal['threshold'] = 'threshold'
     pre_interval: timedelta = timedelta(seconds=10)
     post_interval: timedelta = timedelta(seconds=10)
     enabled: bool = True
@@ -65,11 +67,23 @@ class CameraTrigger(BaseModel):
     trigger_less_than: Optional[float] = None
 
 
+class AlarmCameraTrigger(BaseModel):
+    """Collects video when a new alarm log is raised for `alarm_code`."""
+    alarm_code: str
+    trigger_type: Literal['alarm'] = 'alarm'
+    pre_interval: timedelta = timedelta(seconds=10)
+    post_interval: timedelta = timedelta(seconds=10)
+    enabled: bool = True
+
+
+AnyCameraTrigger = Annotated[CameraTrigger | AlarmCameraTrigger, Field(discriminator='trigger_type')]
+
+
 class Camera(BaseModel):
     code: str
     project: str
     label: str
-    triggers: list[CameraTrigger]
+    triggers: list[AnyCameraTrigger]
     camera_type: CameraType
     encode_timestamp: bool = True
     encode_blur: bool = False
@@ -277,7 +291,7 @@ class MercutoMediaService:
 
     def create_camera(self, project: str,
                       label: str,
-                      triggers: list[CameraTrigger],
+                      triggers: list[AnyCameraTrigger],
                       encode_timestamp: bool = True,
                       encode_blur: bool = False,
                       blur_steps: Optional[int] = None,
