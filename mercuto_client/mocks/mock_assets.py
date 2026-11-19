@@ -6,7 +6,7 @@ from typing import Optional
 
 from ..client import MercutoClient
 from ..exceptions import MercutoHTTPException
-from ..modules.assets import Device, DeviceChannel, Healthcheck, MercutoAssetService, MetadataEntry, Project
+from ..modules.assets import _UNSET, Device, DeviceChannel, Healthcheck, MercutoAssetService, MetadataEntry, Project, _Unset
 from ._utility import EnforceOverridesMeta
 
 logger = logging.getLogger(__name__)
@@ -134,6 +134,7 @@ class MockMercutoAssetService(MercutoAssetService, metaclass=EnforceOverridesMet
         altitude: Optional[float] = None,
         metadata: Optional[dict[str, MetadataEntry]] = None,
         channels: Optional[list[DeviceChannel]] = None,
+        function: Optional[str] = None,
     ) -> Device:
         self.get_project(project)
         if parent is not None:
@@ -150,6 +151,7 @@ class MockMercutoAssetService(MercutoAssetService, metaclass=EnforceOverridesMet
             project=project,
             label=label,
             device_type=device_type,
+            function=function,
             parent=parent,
             latitude=latitude,
             longitude=longitude,
@@ -188,6 +190,7 @@ class MockMercutoAssetService(MercutoAssetService, metaclass=EnforceOverridesMet
         metadata: Optional[dict[str, MetadataEntry]] = None,
         channels: Optional[list[DeviceChannel]] = None,
         device_type: Optional[str] = None,
+        function: str | None | _Unset = _UNSET,
     ) -> Device:
         existing = self.get_device(code)
 
@@ -201,6 +204,7 @@ class MockMercutoAssetService(MercutoAssetService, metaclass=EnforceOverridesMet
         updated = existing.model_copy(update={
             'label': label,
             'device_type': device_type if device_type is not None else existing.device_type,
+            'function': existing.function if isinstance(function, _Unset) else function,
             'parent': parent,
             'latitude': latitude,
             'longitude': longitude,

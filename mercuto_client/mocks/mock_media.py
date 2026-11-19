@@ -7,7 +7,7 @@ from typing import Optional
 
 from ..client import MercutoClient
 from ..exceptions import MercutoHTTPException
-from ..modules.media import Camera, CameraTrigger, CameraType, Image, MercutoMediaService, Video
+from ..modules.media import AnyCameraTrigger, Camera, CameraType, Image, MercutoMediaService, Video
 from ._utility import EnforceOverridesMeta, create_data_url
 
 logger = logging.getLogger(__name__)
@@ -30,7 +30,7 @@ class MockMercutoMediaService(MercutoMediaService, metaclass=EnforceOverridesMet
 
     def create_camera(self, project: str,
                       label: str,
-                      triggers: list[CameraTrigger],
+                      triggers: list[AnyCameraTrigger],
                       encode_timestamp: bool = True,
                       encode_blur: bool = False,
                       blur_steps: Optional[int] = None,
