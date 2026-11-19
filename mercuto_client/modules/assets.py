@@ -1,3 +1,4 @@
+from collections.abc import Sequence
 from datetime import datetime
 from enum import Enum
 from typing import TYPE_CHECKING, Any, Literal, Optional
@@ -63,6 +64,22 @@ class MetadataEntry(BaseModel):
             return cls(data_type='string', is_list=True, values=value)
 
 
+class DeviceComponentIn(BaseModel):
+    """A component to create or retain when replacing the complete component set."""
+    code: str | None = None
+    component_type: str
+    position: int = Field(ge=0, le=2_147_483_647)
+    label: str = Field(min_length=1, max_length=255)
+    metadata: dict[str, MetadataEntry] = Field(default_factory=dict, max_length=100)
+    channels: list[DeviceChannel] = Field(default_factory=list, max_length=50)
+
+
+class DeviceComponent(DeviceComponentIn):
+    code: str
+    created_at: datetime
+    updated_at: datetime
+
+
 class Device(BaseModel):
     code: str
     project: str
@@ -75,6 +92,7 @@ class Device(BaseModel):
     altitude: Optional[float] = None
     metadata: dict[str, MetadataEntry] = Field(default_factory=dict)
     channels: list[DeviceChannel] = []
+    components: list[DeviceComponent] = Field(default_factory=list)
     children: list[str] = []
     created_at: datetime
     updated_at: datetime
@@ -181,13 +199,17 @@ class DeviceTypeMetadataField(BaseModel):
     data_type: Literal['string', 'number', 'boolean', 'document']
     multiple: bool
     unit: Optional[str] = None
+    unit_code: Optional[str] = None
     description: Optional[str] = None
+    required: bool = False
+    identity: bool = False
 
 
 class DeviceTypeChannel(BaseModel):
     field_key: str
     field: str
     unit: Optional[str] = None
+    unit_code: Optional[str] = None
     description: Optional[str] = None
     channel_label_template: Optional[str] = None
     required: bool = True
@@ -202,6 +224,17 @@ class DeviceTypeFunction(BaseModel):
     channels: list[DeviceTypeChannel] = []
 
 
+class DeviceTypeComponentType(BaseModel):
+    key: str
+    label: str
+    plural_label: str
+    description: str | None = None
+    metadata_fields: list[DeviceTypeMetadataField] = Field(default_factory=list)
+    channels: list[DeviceTypeChannel] = Field(default_factory=list)
+    min_count: int = 0
+    max_count: int | None = None
+
+
 class DeviceType(BaseModel):
     code: str
     label: str
@@ -212,9 +245,13 @@ class DeviceType(BaseModel):
     metadata_fields: list[DeviceTypeMetadataField] = []
     channels: list[DeviceTypeChannel] = []
     functions: list[DeviceTypeFunction] = []
+    component_types: list[DeviceTypeComponentType] = Field(default_factory=list)
 
     def get_function(self, key: str) -> Optional[DeviceTypeFunction]:
         return next((function for function in self.functions if function.key == key), None)
+
+    def get_component_type(self, key: str) -> DeviceTypeComponentType | None:
+        return next((component for component in self.component_types if component.key == key), None)
 
 
 # ── Device groups ────────────────────────────────────────────────────────────
@@ -442,13 +479,18 @@ class MercutoAssetService:
     # --- Devices routes ---
 
     def list_devices(self, project: str, limit: int = 100, offset: int = 0) -> list[Device]:
-        params: PayloadType = {
-            'project': project,
-            'limit': limit,
-            'offset': offset,
-        }
-        r = self._client.request(f"{self._path}/devices", 'GET', params=params)
-        return _DeviceListAdapter.validate_json(r.text)
+        """Return up to ``limit`` devices, continuing through byte-limited short pages."""
+        if limit < 1:
+            raise ValueError("limit must be positive")
+        devices: list[Device] = []
+        while len(devices) < limit:
+            params: PayloadType = {'project': project, 'limit': limit - len(devices), 'offset': offset + len(devices)}
+            response = self._client.request(f"{self._path}/devices", 'GET', params=params)
+            page = _DeviceListAdapter.validate_json(response.text)
+            if not page:
+                break
+            devices.extend(page)
+        return devices
 
     def create_device(
         self,
@@ -462,6 +504,7 @@ class MercutoAssetService:
         metadata: Optional[dict[str, MetadataEntry]] = None,
         channels: Optional[list[DeviceChannel]] = None,
         function: Optional[str] = None,
+        components: Sequence[DeviceComponentIn] | _Unset = _UNSET,
     ) -> Device:
         payload: PayloadType = {
             'project': project,
@@ -475,6 +518,11 @@ class MercutoAssetService:
         }
         payload['metadata'] = {k: v.model_dump(mode='json') for k, v in (metadata or {}).items()}  # type: ignore[assignment]
         payload['channels'] = [c.model_dump(mode='json') for c in (channels or [])]  # type: ignore[assignment]
+        if not isinstance(components, _Unset):
+            payload['components'] = [  # type: ignore[assignment]
+                component.model_dump(mode='json', include={'code', 'component_type', 'position', 'label', 'metadata', 'channels'})
+                for component in components
+            ]
         r = self._client.request(f"{self._path}/devices", 'POST', json=payload)
         return Device.model_validate_json(r.text)
 
@@ -494,8 +542,9 @@ class MercutoAssetService:
         channels: Optional[list[DeviceChannel]] = None,
         device_type: Optional[str] = None,
         function: str | None | _Unset = _UNSET,
+        components: Sequence[DeviceComponentIn] | _Unset = _UNSET,
     ) -> Device:
-        """Update a device; omit function to keep it, or pass None to clear it."""
+        """Omit function or components to keep them; a component list replaces the complete set."""
         payload: PayloadType = {
             'label': label,
             'parent': parent,
@@ -509,6 +558,11 @@ class MercutoAssetService:
             payload['function'] = function
         payload['metadata'] = {k: v.model_dump(mode='json') for k, v in (metadata or {}).items()}  # type: ignore[assignment]
         payload['channels'] = [c.model_dump(mode='json') for c in (channels or [])]  # type: ignore[assignment]
+        if not isinstance(components, _Unset):
+            payload['components'] = [  # type: ignore[assignment]
+                component.model_dump(mode='json', include={'code', 'component_type', 'position', 'label', 'metadata', 'channels'})
+                for component in components
+            ]
         r = self._client.request(
             f"{self._path}/devices/{code}", 'PUT', json=payload)
         return Device.model_validate_json(r.text)
