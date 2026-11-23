@@ -2,7 +2,7 @@ import pytest
 
 from ... import MercutoClient
 from ...exceptions import MercutoHTTPException
-from ...modules.assets import DeviceChannel, MetadataEntry
+from ...modules.assets import DeviceChannel, DeviceComponentIn, MetadataEntry
 
 
 def test_healthcheck_and_ping(client: MercutoClient) -> None:
@@ -129,3 +129,15 @@ def test_device_function(client: MercutoClient, function: str | None) -> None:
     assert cleared.function is None
     assert assets.get_device(device.code).function is None
     assert assets.update_device(code=device.code, label='PSA').function is None
+
+
+def test_device_components(client: MercutoClient) -> None:
+    assets = client.assets()
+    project = assets.create_project(tenant='tenant-a', name='Bridge')
+    component = DeviceComponentIn(component_type='segment', position=0, label='Segment 1')
+    device = assets.create_device(project.code, 'IPI', 'sensor', components=[component])
+    assert assets.list_devices(project.code)[0].components[0].label == 'Segment 1'
+    assert assets.update_device(device.code, 'IPI').components == device.components
+    updated = assets.update_device(device.code, 'IPI', components=[component.model_copy(update={'label': 'Replacement'})])
+    assert updated.components[0].label == 'Replacement'
+    assert assets.update_device(device.code, 'IPI', components=[]).components == []

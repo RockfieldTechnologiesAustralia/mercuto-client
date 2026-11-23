@@ -1,16 +1,39 @@
 import ipaddress
 import logging
 import uuid
+from collections.abc import Sequence
 from datetime import datetime, timezone
 from typing import Optional
 
 from ..client import MercutoClient
 from ..exceptions import MercutoHTTPException
-from ..modules.assets import _UNSET, Device, DeviceChannel, Healthcheck, MercutoAssetService, MetadataEntry, Project, _Unset
+from ..modules.assets import (
+    _UNSET,
+    Device,
+    DeviceChannel,
+    DeviceComponent,
+    DeviceComponentIn,
+    Healthcheck,
+    MercutoAssetService,
+    MetadataEntry,
+    Project,
+    _Unset,
+)
 from ._utility import EnforceOverridesMeta
 
 logger = logging.getLogger(__name__)
 UTC = timezone.utc
+
+
+def _components(components: Sequence[DeviceComponentIn], now: datetime) -> list[DeviceComponent]:
+    return [
+        DeviceComponent(
+            code=component.code or str(uuid.uuid4()),
+            component_type=component.component_type, position=component.position, label=component.label,
+            metadata=component.metadata, channels=component.channels, created_at=now, updated_at=now,
+        )
+        for component in components
+    ]
 
 
 class MockMercutoAssetService(MercutoAssetService, metaclass=EnforceOverridesMeta):
@@ -135,6 +158,7 @@ class MockMercutoAssetService(MercutoAssetService, metaclass=EnforceOverridesMet
         metadata: Optional[dict[str, MetadataEntry]] = None,
         channels: Optional[list[DeviceChannel]] = None,
         function: Optional[str] = None,
+        components: Sequence[DeviceComponentIn] | _Unset = _UNSET,
     ) -> Device:
         self.get_project(project)
         if parent is not None:
@@ -162,6 +186,7 @@ class MockMercutoAssetService(MercutoAssetService, metaclass=EnforceOverridesMet
                               field=channel.field, channel=channel.channel, important=channel.important)
                 for channel in (channels or [])
             ],
+            components=[] if isinstance(components, _Unset) else _components(components, now),
             children=[],
             created_at=now,
             updated_at=now,
@@ -191,6 +216,7 @@ class MockMercutoAssetService(MercutoAssetService, metaclass=EnforceOverridesMet
         channels: Optional[list[DeviceChannel]] = None,
         device_type: Optional[str] = None,
         function: str | None | _Unset = _UNSET,
+        components: Sequence[DeviceComponentIn] | _Unset = _UNSET,
     ) -> Device:
         existing = self.get_device(code)
 
@@ -215,6 +241,7 @@ class MockMercutoAssetService(MercutoAssetService, metaclass=EnforceOverridesMet
                               field=channel.field, channel=channel.channel, important=channel.important)
                 for channel in (channels or [])
             ],
+            'components': existing.components if isinstance(components, _Unset) else _components(components, datetime.now(UTC)),
             'updated_at': datetime.now(UTC),
         })
 
